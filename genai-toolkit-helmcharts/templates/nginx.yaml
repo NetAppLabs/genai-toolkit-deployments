@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-toolkit-nginx
+  labels:
+    app: genai-toolkit-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genai-toolkit-nginx
+  template:
+    metadata:
+      labels:
+        app: genai-toolkit-nginx
+    spec:
+      initContainers:
+        - name: wait-for-auth
+          image: busybox
+          command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-rag-api.{{ .Release.Namespace }}.svc.cluster.local:8002/health; do echo waiting for genai-toolkit-rag-api; sleep 2; done']
+      containers:
+        - name: genai-toolkit-nginx
+          {{- if not .Values.localTesting }}
+          image: {{ .Values.dockerRegistry }}nginx:{{ .Chart.Version }}
+          {{- else }}
+          image: localhost:5005/genai-toolkit-nginx:{{ .Values.devTag }}
+          {{- end }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+            - containerPort: 8001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-toolkit-nginx
+spec:
+  type: LoadBalancer
+  selector:
+    app: genai-toolkit-nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      name: http
+    - protocol: TCP
+      port: 443
+      targetPort: 443
+      name: https
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+      name: api

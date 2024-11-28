@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-toolkit-auth
+  labels:
+    app: genai-toolkit-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genai-toolkit-auth
+  template:
+    metadata:
+      labels:
+        app: genai-toolkit-auth
+    spec:
+      initContainers:
+      - name: wait-for-pgvector-db
+        image: pgvector/pgvector:pg16
+        env:
+        - name: CONNECTION_STRING
+          value: {{ if .Values.db.connectionString }}
+                    {{ .Values.db.connectionString | lower | replace ";" " " | replace "database" "dbname" | replace "username" "user"}}
+                  {{ else }}
+                    {{ printf "Host=pgvector.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace | lower | replace ";" " " | replace "database" "dbname" | replace "username" "user" | quote }}
+                  {{ end }}
+        command: ['sh', '-c', 'until psql "$CONNECTION_STRING" -c "SELECT 1"; do echo waiting for pgvector db; sleep 2; done']
+      containers:
+      - name: genai-toolkit-auth
+        {{- if not .Values.localTesting }}
+        image: {{ .Values.dockerRegistry }}genai-toolkit-auth:{{ .Chart.Version }}
+        {{- else }}
+        image: localhost:5005/genai-toolkit-auth:{{ .Values.devTag }}
+        {{- end }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: DB_CONNECTION_STRING
+          value:  {{ if .Values.db.connectionString }}
+                    {{ .Values.db.connectionString | quote }}
+                  {{ else }}
+                    {{ printf "Host=pgvector.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
+                  {{ end }}
+        - name: PRIVATE_KEY_FILE_PATH
+          value: /keys/private/private_key.pem
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        volumeMounts:
+        - name: rsa-keys-volume
+          mountPath: /keys/private
+      restartPolicy: Always
+      volumes:
+      - name: rsa-keys-volume
+        secret:
+          secretName: rsa-keys
+          items:
+          - key: private_key.pem
+            path: private_key.pem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-toolkit-auth
+  labels:
+    app: genai-toolkit-auth
+spec:
+  selector:
+    app: genai-toolkit-auth
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080

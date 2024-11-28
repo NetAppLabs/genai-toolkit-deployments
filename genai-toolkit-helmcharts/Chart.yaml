@@ -1,0 +1,4 @@
+name: genai-toolkit
+description: Helm deployment for NetApp's GenAI toolkit
+version: v0.6.1
+apiVersion: v2

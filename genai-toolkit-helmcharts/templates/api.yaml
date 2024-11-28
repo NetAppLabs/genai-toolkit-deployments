@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-toolkit-api
+  labels:
+    app: genai-toolkit-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genai-toolkit-api
+  template:
+    metadata:
+      labels:
+        app: genai-toolkit-api
+    spec:
+      initContainers:
+        - name: wait-for-auth
+          image: busybox
+          command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-auth.{{ .Release.Namespace }}.svc.cluster.local:8080/health; do echo waiting for genai-toolkit-auth; sleep 2; done']
+      containers:
+        - name: genai-toolkit-api
+          {{- if not .Values.localTesting }}
+          image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Chart.Version }}
+          {{- else }}
+          image: localhost:5005/genai-toolkit-api:{{ .Values.devTag }}
+          {{- end }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8001
+              protocol: TCP
+          env:
+            - name: ROOT_DIR
+              value: {{ .Values.volumesMountPoint }}
+            - name: DB_CONNECTION_STRING
+              value: {{ if .Values.db.connectionString }}
+                        {{ .Values.db.connectionString | quote }}
+                      {{ else }}
+                        {{ printf "Host=pgvector.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
+                      {{ end }}
+            - name: PUBLIC_KEY_PATH
+              value: /keys/public/public_key.rsa
+            - name: RAGAS_HOST
+              value: http://genai-toolkit-rag-api.{{ .Release.Namespace }}.svc.cluster.local:8002
+            - name: TOOLKIT_VERSION
+              value: {{ .Chart.Version | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: rsa-keys-volume
+              mountPath: /keys/public
+            {{- if ne .Values.cloudProvider "local" }}
+            - name: nfs-volume
+              mountPath: {{ .Values.volumesMountPoint }}/{{ .Values.cloudProvider }}/{{ .Values.nfs.path }}
+            {{- else }}
+            - name: nfs-volume
+              mountPath: {{ .Values.volumesMountPoint }}/anf
+            - name: nfs-volume2
+              mountPath: {{ .Values.volumesMountPoint }}/gcnv
+            {{- end }}
+      volumes:
+        - name: rsa-keys-volume
+          secret:
+            secretName: rsa-keys
+            items:
+              - key: public_key.rsa
+                path: public_key.rsa
+        - name: nfs-volume
+          {{- if not .Values.localTesting }}
+          persistentVolumeClaim:
+            claimName: netapp-nfs-pvc
+          {{- else }}
+          hostPath:
+            path: {{ .Values.localDir }}/rag-api/fake-volumes/anf
+        - name: nfs-volume2
+          hostPath:
+            path: {{ .Values.localDir }}/rag-api/fake-volumes/gcnv
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-toolkit-api
+  labels:
+    app: genai-toolkit-api
+spec:
+  selector:
+    app: genai-toolkit-api
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001

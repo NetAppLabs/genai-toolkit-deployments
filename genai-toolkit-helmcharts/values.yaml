@@ -1,0 +1,17 @@
+db:
+  connectionString: ""
+
+nfs:
+  server_ip: ""
+  path: ""
+
+cloudProvider: "anf"
+
+#Do not change unless you know what you are doing
+volumesMountPoint: "/root_dir"
+dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
+
+#For local testing/development only
+localTesting: false
+localDir: ""
+devTag: ""

@@ -1,0 +1,59 @@
+{{- if not .Values.db.connectionString }}
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: pgvector-replicaset
+  labels:
+    app: pgvector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgvector
+  template:
+    metadata:
+      labels:
+        app: pgvector
+    spec:
+      containers:
+        - name: pgvector
+          image: pgvector/pgvector:pg16
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "genai-toolkit-db"
+            - name: POSTGRES_USER
+              value: "admin"
+            - name: POSTGRES_PASSWORD
+              value: "admin"
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: pgvector-storage
+      volumes:
+        - name: pgvector-storage
+          {{- if not .Values.localTesting }}
+          persistentVolumeClaim:
+            claimName: pvc-pgvector
+          {{- else }}
+          hostPath:
+            path: {{ .Values.localDir }}/postgres
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgvector
+  labels:
+    app: pgvector
+spec:
+  selector:
+    app: pgvector
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+{{- end }}

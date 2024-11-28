@@ -1,0 +1,38 @@
+{{- $nfs_path := .Values.nfs.path | required "NFS path is required" }}
+{{- $nfs_server_ip := .Values.nfs.server_ip | required "NFS server IP is required" }}
+---
+{{- if not .Values.localTesting }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-storage-class
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: netapp-nfs-pv
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage-class
+  nfs:
+    path: {{ .Values.nfs.path }}
+    server: {{ .Values.nfs.server_ip }}
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netapp-nfs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: nfs-storage-class
+{{- end }}
