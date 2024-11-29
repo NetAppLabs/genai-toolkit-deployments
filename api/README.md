@@ -1,6 +1,6 @@
 # GenAI Toolkit API
 
-Welcome to the GenAI Toolkit API! This toolkit provides a set of powerful APIs designed to help you build GenAI workflows and application grounded in your own data on Google Cloud NetApp Volumes or Azure NetApp Files. The API allows you to create and manage chat sessions with your data, export SmartPrompts (experts on topics based on your data) and evaluate LLM models and their RAG performance, and more. This README provides an overview of the API endpoints and how to get started. [Click here for swagger definition](genai-toolkit-api-v1-swagger.json)
+Welcome to the GenAI Toolkit API! This toolkit provides a set of powerful APIs designed to help you build GenAI workflows and application grounded in your own data on Google Cloud NetApp Volumes or Azure NetApp Files. The API allows you to create and manage chat sessions with your data, export SmartPrompts (experts on topics based on your data) and evaluate LLM models and their RAG performance, and more. This README provides an overview of the API endpoints and how to get started. [Click here for swagger definition](apiv2_swagger.json)
 
 
 
