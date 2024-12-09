@@ -2,21 +2,6 @@
 
 A self-managed cloud native solution with an easy to use UI and API to get started with GenAI, RAG workflows, Chatbots and AI assistants building with unstructured data on Azure NetApp Files or Google Cloud NetApp Volumes. Use it standalone (it has a great UI) or as a component in custom workflows via its API.
 
-## Table of Contents
-1. [Requirements](#requirements)
-2. [Provides](#provides)
-3. [Screenshots](#screenshots)
-4. [Deploying the Toolkit](#deploying-the-toolkit)
-  - [Getting Started](#getting-started)
-  - [Helm Parameters](#helm-parameters)
-    - [Required Parameters](#required-parameters)
-    - [Optional Parameters](#optional-parameters)
-5. [Changelog](#changelog)
-6. [Support](#support)
-
-## Requirements
-To deploy the GenAI Toolkit, ensure that the NFS volume is accessible from the Kubernetes cluster's network. For example, if you are using Azure NetApp Files (ANF) and Azure Kubernetes Service (AKS), both should be on the same virtual network (vNet) or the vNets should be peered.
-
 ## Provides
 - Enterprise level Document Search through LLM vector embeddings (auto embeds with built in PGVector DB)
 - Chatbot (RAG) UI/API
@@ -25,23 +10,211 @@ To deploy the GenAI Toolkit, ensure that the NFS volume is accessible from the K
 - Exportable Smart Prompts/Chatbot endpoints
 - (Assistants/Agents TBD)
 
-## Screenshots (on Azure)
-![Services](images/services.png)
-![Search](images/search.png)
-![Save Smart Prompt](images/savesmartprompt.png)
-![Image Generation](images/image-generation.png)
-![API](images/api.png)
+-----------------------
+
+## Table of Contents
+1. [Deploying the Toolkit](#deploying-the-toolkit)
+  - [AKS](#aks)
+    - [Quickstart](#aks-quickstart)
+    - [Requirements](#aks-requirements)
+    - [Setting up an ANF Volume](#setting-up-an-anf-volume)
+    - [Setting up an AKS Cluster](#setting-up-an-aks-cluster)
+    - [Verifying Network Access to the ANF Volume](#verifying-network-access-to-the-anf-volume)
+    - [Deployment](#aks-deployment)
+  - [GKE](#gke)
+    - [Quickstart](#gke-quickstart)
+    - [Requirements](#gke-requirements)
+    - [Setting up a GCNV Volume](#setting-up-a-gcnv-volume)
+    - [Setting up a GKE Cluster](#setting-up-a-gke-cluster)
+    - [Verifying Network Access to the GCNV Volume](#verifying-network-access-to-the-gcnv-volume)
+    - [Deployment](#gke-deployment)
+  - [Local K8s](#local-k8s)
+    - [Quickstart](#local-deployment-quickstart)
+    - [Requirements](#local-deployment-requirements)
+    - [Deployment](#local-deployment)
+  - [Extra deployment info](#extra)
+    - [Helm Parameters](#helm-parameters)
+    - [Required Parameters](#required-parameters)
+    - [Optional Parameters](#optional-parameters)
+2. [Screenshots](#screenshots)
+3. [Changelog](#changelog)
+4. [Support](#support)
+
 
 ## Deploying the Toolkit
+The toolkit consists of Kubernetes YAML files, packaged as Helm charts, which can be installed on any cluster using Helm. Below are instructions on how to deploy the toolkit to a local Kubernetes cluster, AKS, and GKE. If your environment is already set up, you can use the `Quickstart` section for each deployment method.
 
-The toolkit is a set of kubernetes yamls, wrapped up in helm charts that can be installed on any cluster using helm.
+### AKS
 
-### Getting Started
-From the root directory of the repository, just run:
+#### AKS Quickstart
+```sh
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+```
+
+#### AKS Requirements
+For ANF, the toolkit requires an AKS cluster, at least one ANF volume, and connectivity between the volumes and the cluster.
+
+#### Setting up an ANF Volume
+To get started, follow this guide: [Create an NFS volume for Azure NetApp Files](https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-volumes). Note the vNet where you create the volume. Once the volume is available, proceed to the next step.
+
+#### Setting up an AKS Cluster
+Follow this guide: [Quickstart: Deploy an Azure Kubernetes Service (AKS) cluster using Azure portal](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-portal?tabs=azure-cli). Note the vNet where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
+
+#### Verifying Network Access to the ANF Volume
+To verify network access between your AKS cluster and the ANF volume, follow these steps:
+
+1. **Deploy a test pod**: Deploy a simple test pod in your AKS cluster with tools like `curl` or `ping` installed. Use the following YAML to create a test pod:
+
+  ```yaml
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: test-pod
+  spec:
+    containers:
+    - name: test-container
+      image: busybox
+      command: ['sh', '-c', 'sleep 3600']
+      resources:
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+  ```
+
+  Apply the YAML file using `kubectl apply -f test-pod.yaml`.
+
+2. **Access the test pod**: Once the pod is running, access it using:
+
+  ```sh
+  kubectl exec -it test-pod -- sh
+  ```
+
+3. **Test connectivity**: Inside the pod, use `ping` or `curl` to test connectivity to the ANF volume's IP address:
+
+  ```sh
+  ping <ANF_VOLUME_IP>
+  ```
+
+  or
+
+  ```sh
+  curl <ANF_VOLUME_IP>
+  ```
+
+If you receive responses, the network access between the AKS cluster and the ANF volume is properly configured.
+
+### AKS Deployment
+Once your Azure resources are set up, deploy the toolkit using:
 
 ```sh
 helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
 ```
+
+Replace `nfs.server_ip` with the IP address of your ANF volume and `nfs.path` with the path to your volume. This information is available in the mount instructions for the volume.
+
+After the toolkit starts up, get the public IP by running:
+
+```sh
+kubectl get svc genai-toolkit-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+```
+
+Use this IP to access the UI in your preferred browser or to make direct API calls.
+
+### GKE
+
+#### GKE Quickstart
+```sh
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+```
+
+#### GKE Requirements
+For GCNV, the toolkit requires a GKE cluster, at least one GCNV volume, and connectivity between the volumes and the cluster.
+
+#### Setting up a GCNV Volume
+To get started, follow this guide: [Create an NFS volume for Google Cloud NetApp Volumes](https://cloud.google.com/netapp/docs/create-volumes). Note the VPC where you create the volume. Once the volume is available, proceed to the next step.
+
+#### Setting up a GKE Cluster
+Follow this guide: [Quickstart: Deploy a GKE cluster](https://cloud.google.com/kubernetes-engine/docs/quickstart). Note the VPC where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
+
+#### Verifying Network Access to the GCNV Volume
+To verify network access between your GKE cluster and the GCNV volume, follow these steps:
+
+1. **Deploy a test pod**: Deploy a simple test pod in your GKE cluster with tools like `curl` or `ping` installed. Use the following YAML to create a test pod:
+
+  ```yaml
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: test-pod
+  spec:
+    containers:
+    - name: test-container
+      image: busybox
+      command: ['sh', '-c', 'sleep 3600']
+      resources:
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+  ```
+
+  Apply the YAML file using `kubectl apply -f test-pod.yaml`.
+
+2. **Access the test pod**: Once the pod is running, access it using:
+
+  ```sh
+  kubectl exec -it test-pod -- sh
+  ```
+
+3. **Test connectivity**: Inside the pod, use `ping` or `curl` to test connectivity to the GCNV volume's IP address:
+
+  ```sh
+  ping <GCNV_VOLUME_IP>
+  ```
+
+  or
+
+  ```sh
+  curl <GCNV_VOLUME_IP>
+  ```
+
+If you receive responses, the network access between the GKE cluster and the GCNV volume is properly configured.
+
+### GKE Deployment
+Once your Google Cloud resources are set up, deploy the toolkit using:
+
+```sh
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+```
+
+Replace `nfs.server_ip` with the IP address of your GCNV volume and `nfs.path` with the path to your volume. This information is available in the mount instructions for the volume.
+
+After the toolkit starts up, get the public IP by running:
+
+```sh
+kubectl get svc genai-toolkit-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+```
+
+Use this IP to access the UI in your preferred browser or to make direct API calls.
+### Local K8s
+
+#### Local Deployment Quickstart
+```sh
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+```
+
+#### Local Deployment Requirements
+For local deployment, you need a local Kubernetes cluster running. You can use Docker Desktop to set up a local Kubernetes cluster. Follow this guide to enable Kubernetes in Docker Desktop: [Docker Desktop - Enable Kubernetes](https://docs.docker.com/desktop/kubernetes/).
+
+#### Local Deployment
+Once your local Kubernetes cluster is set up, deploy the toolkit using:
+
+```sh
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+```
+
+Replace `nfs.server_ip` with the IP address of your NFS server and `nfs.path` with the path to your volume. This information is available in the mount instructions for the volume.
+
+After the toolkit starts up use `localhost` to access the UI in your preferred browser or to make direct API calls.
 
 ### Helm Parameters
 
@@ -62,6 +235,17 @@ helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nf
 Note: By not setting the `db.connectionString` the toolkit will default to use an in cluster database. This is not recommended for production use cases. For testing, it is fine.
 
 There are other optional variables but these are only used for development of the toolkit and do not require any attention.
+
+
+
+## Screenshots (on Azure)
+![Services](images/services.png)
+![Search](images/search.png)
+![Save Smart Prompt](images/savesmartprompt.png)
+![Image Generation](images/image-generation.png)
+![API](images/api.png)
+
+
 
 ## Changelog
 v0.6.0:

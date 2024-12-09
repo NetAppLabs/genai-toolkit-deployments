@@ -1,5 +1,7 @@
-{{- $nfs_path := .Values.nfs.path | required "NFS path is required" }}
-{{- $nfs_server_ip := .Values.nfs.server_ip | required "NFS server IP is required" }}
+{{- if not .Values.localTesting }}
+  {{- $nfs_path := .Values.nfs.path | required "NFS path is required" }}
+  {{- $nfs_server_ip := .Values.nfs.server_ip | required "NFS server IP is required" }}
+{{- end }}
 ---
 {{- if not .Values.localTesting }}
 apiVersion: storage.k8s.io/v1
