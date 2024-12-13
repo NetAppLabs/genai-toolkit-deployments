@@ -1,9 +1,4 @@
 {{- if not .Values.localTesting }}
-  {{- $nfs_path := .Values.nfs.path | required "NFS path is required" }}
-  {{- $nfs_server_ip := .Values.nfs.server_ip | required "NFS server IP is required" }}
-{{- end }}
----
-{{- if not .Values.localTesting }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -11,10 +6,12 @@ metadata:
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: Immediate
 ---
+  {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
+    {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: netapp-nfs-pv
+  name: netapp-nfs-pv-{{ $index }}
 spec:
   capacity:
     storage: 100Gi
@@ -22,14 +19,14 @@ spec:
     - ReadWriteMany
   storageClassName: nfs-storage-class
   nfs:
-    path: {{ .Values.nfs.path }}
-    server: {{ .Values.nfs.server_ip }}
+    path: {{ index $nfs_volume_parts 1}}
+    server: {{ index $nfs_volume_parts 0}}
   persistentVolumeReclaimPolicy: Retain
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: netapp-nfs-pvc
+  name: netapp-nfs-pvc-{{ $index }}
 spec:
   accessModes:
     - ReadWriteMany
@@ -37,4 +34,6 @@ spec:
     requests:
       storage: 100Gi
   storageClassName: nfs-storage-class
+---
+  {{- end }}
 {{- end }}

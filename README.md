@@ -48,8 +48,9 @@ The toolkit consists of Kubernetes YAML files, packaged as Helm charts, which ca
 
 #### AKS Quickstart
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
 ```
+Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
 
 #### AKS Requirements
 For ANF, the toolkit requires an AKS cluster, at least one ANF volume, and connectivity between the volumes and the cluster.
@@ -89,16 +90,10 @@ To verify network access between your AKS cluster and the ANF volume, follow the
   kubectl exec -it test-pod -- sh
   ```
 
-3. **Test connectivity**: Inside the pod, use `ping` or `curl` to test connectivity to the ANF volume's IP address:
+3. **Test connectivity**: Inside the pod, use `ping` to test connectivity to the ANF volume's IP address:
 
   ```sh
   ping <ANF_VOLUME_IP>
-  ```
-
-  or
-
-  ```sh
-  curl <ANF_VOLUME_IP>
   ```
 
 If you receive responses, the network access between the AKS cluster and the ANF volume is properly configured.
@@ -107,10 +102,12 @@ If you receive responses, the network access between the AKS cluster and the ANF
 Once your Azure resources are set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
 ```
+Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
 
-Replace `nfs.server_ip` with the IP address of your ANF volume and `nfs.path` with the path to your volume. This information is available in the mount instructions for the volume.
+
+Replace `nfs.volumes` with the NFS paths of your ANF volumes. This information is available in the mount instructions for the volume.
 
 After the toolkit starts up, get the public IP by running:
 
@@ -124,8 +121,10 @@ Use this IP to access the UI in your preferred browser or to make direct API cal
 
 #### GKE Quickstart
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
 ```
+Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
+
 
 #### GKE Requirements
 For GCNV, the toolkit requires a GKE cluster, at least one GCNV volume, and connectivity between the volumes and the cluster.
@@ -183,10 +182,12 @@ If you receive responses, the network access between the GKE cluster and the GCN
 Once your Google Cloud resources are set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
 ```
+Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
 
-Replace `nfs.server_ip` with the IP address of your GCNV volume and `nfs.path` with the path to your volume. This information is available in the mount instructions for the volume.
+
+Replace `nfs.volumes` with the NFS paths of your ANF volumes. This information is available in the mount instructions for the volume.
 
 After the toolkit starts up, get the public IP by running:
 
@@ -220,10 +221,9 @@ After the toolkit starts up use `localhost` to access the UI in your preferred b
 
 #### Required Parameters
 
-| Parameter       | Description                            | Default Value |
-|-----------------|----------------------------------------|---------------|
-| `nfs.server_ip` | IP address of the NFS server.          | None          |
-| `nfs.path`      | Path on the NFS server.                | None          |
+| Parameter       | Description                            | Example value                   | Default Value |
+|-----------------|----------------------------------------|---------------------------------|---------------|
+| `nfs.volumes`   | A list of NFS connection strings       | `1.2.3.4:/path1,5.6.7.8:/path2` | None          |
 
 #### Optional Parameters
 

@@ -36,7 +36,7 @@ spec:
               value: {{ if .Values.db.connectionString }}
                         {{ .Values.db.connectionString | quote }}
                       {{ else }}
-                        {{ printf "Host=pgvector.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
+                        {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
                       {{ end }}
             - name: PUBLIC_KEY_PATH
               value: /keys/public/public_key.rsa
@@ -54,14 +54,16 @@ spec:
           volumeMounts:
             - name: rsa-keys-volume
               mountPath: /keys/public
-            {{- if ne .Values.cloudProvider "local" }}
-            - name: nfs-volume
-              mountPath: {{ .Values.volumesMountPoint }}/{{ .Values.cloudProvider }}/{{ .Values.nfs.path }}
+            {{- if not .Values.localTesting }}
+              {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
+                {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+                {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
+            - name: nfs-volume-{{ $index }}
+              mountPath: {{ $concatString }}
+              {{- end }}
             {{- else }}
-            - name: nfs-volume
-              mountPath: {{ .Values.volumesMountPoint }}/anf
-            - name: nfs-volume2
-              mountPath: {{ .Values.volumesMountPoint }}/gcnv
+            - name: nfs-volume-0
+              mountPath: {{ .Values.volumesMountPoint }}/{{ .Values.cloudProvider }}/
             {{- end }}
       volumes:
         - name: rsa-keys-volume
@@ -70,17 +72,18 @@ spec:
             items:
               - key: public_key.rsa
                 path: public_key.rsa
-        - name: nfs-volume
-          {{- if not .Values.localTesting }}
+        {{- if not .Values.localTesting }}
+          {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
+            {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+        - name: nfs-volume-{{ $index }}
           persistentVolumeClaim:
-            claimName: netapp-nfs-pvc
-          {{- else }}
-          hostPath:
-            path: {{ .Values.localDir }}/rag-api/fake-volumes/anf
-        - name: nfs-volume2
-          hostPath:
-            path: {{ .Values.localDir }}/rag-api/fake-volumes/gcnv
+            claimName: netapp-nfs-pvc-{{ $index }}
           {{- end }}
+        {{- else }}
+        - name: nfs-volume-0
+          hostPath:
+            path: {{ .Values.localDir }}/rag-api/fake-volumes
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service

@@ -15,16 +15,16 @@ spec:
         app: genai-toolkit-auth
     spec:
       initContainers:
-      - name: wait-for-pgvector-db
+      - name: wait-for-postgres-db
         image: pgvector/pgvector:pg16
         env:
         - name: CONNECTION_STRING
           value: {{ if .Values.db.connectionString }}
                     {{ .Values.db.connectionString | lower | replace ";" " " | replace "database" "dbname" | replace "username" "user"}}
                   {{ else }}
-                    {{ printf "Host=pgvector.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace | lower | replace ";" " " | replace "database" "dbname" | replace "username" "user" | quote }}
+                    {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace | lower | replace ";" " " | replace "database" "dbname" | replace "username" "user" | quote }}
                   {{ end }}
-        command: ['sh', '-c', 'until psql "$CONNECTION_STRING" -c "SELECT 1"; do echo waiting for pgvector db; sleep 2; done']
+        command: ['sh', '-c', 'until psql "$CONNECTION_STRING" -c "SELECT 1"; do echo waiting for postgres db; sleep 2; done']
       containers:
       - name: genai-toolkit-auth
         {{- if not .Values.localTesting }}
@@ -41,7 +41,7 @@ spec:
           value:  {{ if .Values.db.connectionString }}
                     {{ .Values.db.connectionString | quote }}
                   {{ else }}
-                    {{ printf "Host=pgvector.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
+                    {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
                   {{ end }}
         - name: PRIVATE_KEY_FILE_PATH
           value: /keys/private/private_key.pem

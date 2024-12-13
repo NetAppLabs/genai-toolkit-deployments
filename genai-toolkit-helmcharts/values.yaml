@@ -2,8 +2,7 @@ db:
   connectionString: ""
 
 nfs:
-  server_ip: ""
-  path: ""
+  volumes: ""
 
 cloudProvider: "anf"
 

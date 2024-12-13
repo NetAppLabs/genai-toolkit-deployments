@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-pgvector
+  name: pv-postgres
 spec:
   capacity:
     storage: 10Gi
@@ -14,7 +14,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-pgvector
+  name: pvc-postgres
 spec:
   accessModes:
     - ReadWriteOnce

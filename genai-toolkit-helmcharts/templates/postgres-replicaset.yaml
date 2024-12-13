@@ -2,21 +2,21 @@
 apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
-  name: pgvector-replicaset
+  name: postgres-replicaset
   labels:
-    app: pgvector
+    app: postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: pgvector
+      app: postgres
   template:
     metadata:
       labels:
-        app: pgvector
+        app: postgres
     spec:
       containers:
-        - name: pgvector
+        - name: postgres
           image: pgvector/pgvector:pg16
           imagePullPolicy: Always
           ports:
@@ -32,12 +32,12 @@ spec:
               value: "/var/lib/postgresql/data/pgdata"
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
-              name: pgvector-storage
+              name: postgres-storage
       volumes:
-        - name: pgvector-storage
+        - name: postgres-storage
           {{- if not .Values.localTesting }}
           persistentVolumeClaim:
-            claimName: pvc-pgvector
+            claimName: pvc-postgres
           {{- else }}
           hostPath:
             path: {{ .Values.localDir }}/postgres
@@ -46,12 +46,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: pgvector
+  name: postgres
   labels:
-    app: pgvector
+    app: postgres
 spec:
   selector:
-    app: pgvector
+    app: postgres
   ports:
     - protocol: TCP
       port: 5432
