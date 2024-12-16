@@ -200,20 +200,22 @@ Use this IP to access the UI in your preferred browser or to make direct API cal
 
 #### Local Deployment Quickstart
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localDir="/path/to/your/dataset/directory"
 ```
 
 #### Local Deployment Requirements
 For local deployment, you need a local Kubernetes cluster running. You can use Docker Desktop to set up a local Kubernetes cluster. Follow this guide to enable Kubernetes in Docker Desktop: [Docker Desktop - Enable Kubernetes](https://docs.docker.com/desktop/kubernetes/).
 
+We have also tested this on Minikube and Orbstack but theoretically, it should work on any local K8s orchestrator. Note you might have to mount the directory into Minikube first for this to work.
+
 #### Local Deployment
 Once your local Kubernetes cluster is set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",nfs.server_ip="1.2.3.4",nfs.path="my-directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localDir="/path/to/your/dataset/directory"
 ```
 
-Replace `nfs.server_ip` with the IP address of your NFS server and `nfs.path` with the path to your volume. This information is available in the mount instructions for the volume.
+Replace `localDir` path with the absolute path to your dataset on your local machine. This will mount your local directory into the container as "ONTAP" volumes.
 
 After the toolkit starts up use `localhost` to access the UI in your preferred browser or to make direct API calls.
 
@@ -227,10 +229,11 @@ After the toolkit starts up use `localhost` to access the UI in your preferred b
 
 #### Optional Parameters
 
-| Parameter             | Description                              | Default Value | Available values |
-|-----------------------|------------------------------------------|---------------|------------------|
-| `cloudProvider`       | Specifies the cloud provider to use.     | `anf`         | `anf` / `gcnv`   |
-| `db.connectionString` | Specifies the database connection string | None          |
+| Parameter             | Description                                      | Default Value | Available values          |
+|-----------------------|--------------------------------------------------|---------------|---------------------------|
+| `cloudProvider`       | The cloud provider to use.                       | `anf`         | `anf` / `gcnv` / `local`  |
+| `db.connectionString` | The database connection string                   | To K8s DB     |                           |
+| `localDir`            | The local directory to use as a dataset "volume" | None          |                           |                  
 
 Note: By not setting the `db.connectionString` the toolkit will default to use an in cluster database. This is not recommended for production use cases. For testing, it is fine.
 

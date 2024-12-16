@@ -54,7 +54,7 @@ spec:
           volumeMounts:
             - name: rsa-keys-volume
               mountPath: /keys/public
-            {{- if not .Values.localTesting }}
+            {{- if ne .Values.cloudProvider "local" }}
               {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
                 {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
                 {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
@@ -63,7 +63,7 @@ spec:
               {{- end }}
             {{- else }}
             - name: nfs-volume-0
-              mountPath: {{ .Values.volumesMountPoint }}/{{ .Values.cloudProvider }}/
+              mountPath: {{ .Values.volumesMountPoint }}/ontap/{{ (splitList "/" .Values.localDir | last) }}
             {{- end }}
       volumes:
         - name: rsa-keys-volume
@@ -72,7 +72,7 @@ spec:
             items:
               - key: public_key.rsa
                 path: public_key.rsa
-        {{- if not .Values.localTesting }}
+        {{- if ne .Values.cloudProvider "local" }}
           {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
             {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
         - name: nfs-volume-{{ $index }}
@@ -82,7 +82,7 @@ spec:
         {{- else }}
         - name: nfs-volume-0
           hostPath:
-            path: {{ .Values.localDir }}/rag-api/fake-volumes
+            path: {{ .Values.localDir }}
         {{- end }}
 ---
 apiVersion: v1

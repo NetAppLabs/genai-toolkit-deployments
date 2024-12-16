@@ -1,4 +1,4 @@
-{{- if not .Values.localTesting }}
+{{- if ne .Values.cloudProvider "local" }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -16,7 +16,7 @@ spec:
   capacity:
     storage: 100Gi
   accessModes:
-    - ReadWriteMany
+    - ReadOnlyMany
   storageClassName: nfs-storage-class
   nfs:
     path: {{ index $nfs_volume_parts 1}}
@@ -29,7 +29,7 @@ metadata:
   name: netapp-nfs-pvc-{{ $index }}
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadOnlyMany
   resources:
     requests:
       storage: 100Gi
