@@ -136,35 +136,7 @@ To get started, follow this guide: [Create an NFS volume for Google Cloud NetApp
 Follow this guide: [Quickstart: Deploy a GKE cluster](https://cloud.google.com/kubernetes-engine/docs/quickstart). Note the VPC where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
 
 #### Verifying Network Access to the GCNV Volume
-To verify network access between your GKE cluster and the GCNV volume, follow these steps:
-
-1. **Deploy a test pod**: Deploy a simple test pod in your GKE cluster with tools like `curl` or `ping` installed. Use the following YAML to create a test pod:
-
-  ```yaml
-  apiVersion: v1
-  kind: Pod
-  metadata:
-    name: test-pod
-  spec:
-    containers:
-    - name: test-container
-      image: busybox
-      command: ['sh', '-c', 'sleep 3600']
-      resources:
-        limits:
-          memory: "128Mi"
-          cpu: "500m"
-  ```
-
-  Apply the YAML file using `kubectl apply -f test-pod.yaml`.
-
-2. **Access the test pod**: Once the pod is running, access it using:
-
-  ```sh
-  kubectl exec -it test-pod -- sh
-  ```
-
-3. **Test connectivity**: For some reason, you are unable to ping or curl the volumes in GCNV from the cluster. But if they are on the same subnet, you should have access to the volume fromt he cluster.
+For some reason, you are unable to ping or curl the volumes in GCNV from the cluster. But if they are on the same subnet, you should have access to the volume fromt he cluster.
 
 ### GKE Deployment
 Once your Google Cloud resources are set up, deploy the toolkit using:
