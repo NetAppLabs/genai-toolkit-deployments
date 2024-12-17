@@ -164,19 +164,7 @@ To verify network access between your GKE cluster and the GCNV volume, follow th
   kubectl exec -it test-pod -- sh
   ```
 
-3. **Test connectivity**: Inside the pod, use `ping` or `curl` to test connectivity to the GCNV volume's IP address:
-
-  ```sh
-  ping <GCNV_VOLUME_IP>
-  ```
-
-  or
-
-  ```sh
-  curl <GCNV_VOLUME_IP>
-  ```
-
-If you receive responses, the network access between the GKE cluster and the GCNV volume is properly configured.
+3. **Test connectivity**: For some reason, you are unable to ping or curl the volumes in GCNV from the cluster. But if they are on the same subnet, you should have access to the volume fromt he cluster.
 
 ### GKE Deployment
 Once your Google Cloud resources are set up, deploy the toolkit using:
@@ -212,28 +200,21 @@ We have also tested this on Minikube and Orbstack but theoretically, it should w
 Once your local Kubernetes cluster is set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localDir="/path/to/your/dataset/directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localDir="/path/to/your/dataset/directory\,/path/to/your/second/dataset/directory"
 ```
 
-Replace `localDir` path with the absolute path to your dataset on your local machine. This will mount your local directory into the container as "ONTAP" volumes.
+Replace `localDir` is a list of absolute paths to your datasets on your local machine. This will mount your local directories into the container as "ONTAP" volumes.
 
 After the toolkit starts up use `localhost` to access the UI in your preferred browser or to make direct API calls.
 
-### Helm Parameters
+### Helm Chart Parameters
 
-#### Required Parameters
-
-| Parameter       | Description                            | Example value                   | Default Value |
-|-----------------|----------------------------------------|---------------------------------|---------------|
-| `nfs.volumes`   | A list of NFS connection strings       | `1.2.3.4:/path1,5.6.7.8:/path2` | None          |
-
-#### Optional Parameters
-
-| Parameter             | Description                                      | Default Value | Available values          |
-|-----------------------|--------------------------------------------------|---------------|---------------------------|
-| `cloudProvider`       | The cloud provider to use.                       | `anf`         | `anf` / `gcnv` / `local`  |
-| `db.connectionString` | The database connection string                   | To K8s DB     |                           |
-| `localDir`            | The local directory to use as a dataset "volume" | None          |                           |                  
+| Parameter             | Description                                      | Default Value                   | Available values          |
+|-----------------------|--------------------------------------------------|---------------------------------|---------------------------|
+| `nfs.volumes`         | A list of NFS connection strings                 | `1.2.3.4:/path1,5.6.7.8:/path2` | None                      |
+| `cloudProvider`       | The cloud provider to use.                       | `anf`                           | `anf` / `gcnv` / `local`  |
+| `db.connectionString` | The database connection string                   | To K8s DB                       |                           |
+| `localDir`            | The local directory to use as a dataset "volume" | None                            |                           |                  
 
 Note: By not setting the `db.connectionString` the toolkit will default to use an in cluster database. This is not recommended for production use cases. For testing, it is fine.
 
