@@ -30,7 +30,7 @@ spec:
         {{- if not .Values.localTesting }}
         image: {{ .Values.dockerRegistry }}genai-toolkit-auth:{{ .Chart.Version }}
         {{- else }}
-        image: localhost:5005/genai-toolkit-auth:{{ .Values.devTag }}
+        image: {{ .Values.dockerRegistry }}genai-toolkit-auth:{{ .Values.devTag }}
         {{- end }}
         imagePullPolicy: Always
         ports:

@@ -23,7 +23,7 @@ spec:
           {{- if not .Values.localTesting }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-ui:{{ .Chart.Version }}
           {{- else }}
-          image: localhost:5005/genai-toolkit-ui:{{ .Values.devTag }}
+          image: {{ .Values.dockerRegistry }}genai-toolkit-ui:{{ .Values.devTag }}
           {{- end }}
           imagePullPolicy: Always
           ports:

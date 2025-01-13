@@ -102,9 +102,9 @@ If you receive responses, the network access between the AKS cluster and the ANF
 Once your Azure resources are set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.volumes="1.2.3.4:/path1;5.6.7.8:/path2"
 ```
-Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
+Note that the delimiter to split volumes for `nfs.volumes` is a semicolon.
 
 
 Replace `nfs.volumes` with the NFS paths of your ANF volumes. This information is available in the mount instructions for the volume.
@@ -121,9 +121,9 @@ Use this IP to access the UI in your preferred browser or to make direct API cal
 
 #### GKE Quickstart
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1;5.6.7.8:/path2"
 ```
-Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
+Note that the delimiter to split volumes for `nfs.volumes` is a semicolon.
 
 
 #### GKE Requirements
@@ -142,9 +142,9 @@ For some reason, you are unable to ping or curl the volumes in GCNV from the clu
 Once your Google Cloud resources are set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1;5.6.7.8:/path2"
 ```
-Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
+Note that the delimiter to split volumes for `nfs.volumes` is a semicolon.
 
 
 Replace `nfs.volumes` with the NFS paths of your ANF volumes. This information is available in the mount instructions for the volume.
@@ -160,7 +160,7 @@ Use this IP to access the UI in your preferred browser or to make direct API cal
 
 #### Local Deployment Quickstart
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localDir="/path/to/your/dataset/directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localVolumePaths="/path/to/your/dataset/directory"
 ```
 
 #### Local Deployment Requirements
@@ -172,10 +172,10 @@ We have also tested this on Minikube and Orbstack but theoretically, it should w
 Once your local Kubernetes cluster is set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localDir="/path/to/your/dataset/directory\,/path/to/your/second/dataset/directory"
+helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localVolumePaths="/path/to/your/dataset/directory;/path/to/your/second/dataset/directory"
 ```
 
-Replace `localDir` is a list of absolute paths to your datasets on your local machine. This will mount your local directories into the container as "ONTAP" volumes.
+Replace `localVolumePaths` is a list of absolute paths to your datasets on your local machine. This will mount your local directories into the container as "ONTAP" volumes.
 
 After the toolkit starts up use `localhost` to access the UI in your preferred browser or to make direct API calls.
 
@@ -183,10 +183,10 @@ After the toolkit starts up use `localhost` to access the UI in your preferred b
 
 | Parameter             | Description                                      | Default Value                   | Available values          |
 |-----------------------|--------------------------------------------------|---------------------------------|---------------------------|
-| `nfs.volumes`         | A list of NFS connection strings                 | `1.2.3.4:/path1,5.6.7.8:/path2` | None                      |
+| `nfs.volumes`         | A list of NFS connection strings                 | None                            |                           |
 | `cloudProvider`       | The cloud provider to use.                       | `anf`                           | `anf` / `gcnv` / `local`  |
 | `db.connectionString` | The database connection string                   | To K8s DB                       |                           |
-| `localDir`            | The local directory to use as a dataset "volume" | None                            |                           |                  
+| `localVolumePaths`    | The local directory to use as a dataset "volume" | None                            |                           |                  
 
 Note: By not setting the `db.connectionString` the toolkit will default to use an in cluster database. This is not recommended for production use cases. For testing, it is fine.
 
@@ -204,6 +204,12 @@ There are other optional variables but these are only used for development of th
 
 
 ## Changelog
+v0.7.0:
+- Fixed multiple bugs, including token logout issues, local development paths, clustering slowness, and UI build failures.
+- Added support for Claude3, Anthropic API integration, and bearer tokens in the Tool Manager.
+- Improved performance with enhanced multithreading, retry logic, and faster document embedding.
+- Updated build and configuration systems, including removing Poetry dependencies and adding run profiles for local vs Kubernetes setups.
+0 Enhanced UI clarity, logging, and documentation for end-to-end tests and local setups.
 v0.6.0:
 - Improved document handling
 - Deployment changed to Helm

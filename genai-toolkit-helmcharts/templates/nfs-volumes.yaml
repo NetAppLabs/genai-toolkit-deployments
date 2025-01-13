@@ -6,7 +6,7 @@ metadata:
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: Immediate
 ---
-  {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
+  {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
     {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
 apiVersion: v1
 kind: PersistentVolume

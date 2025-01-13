@@ -40,7 +40,7 @@ spec:
             claimName: pvc-postgres
           {{- else }}
           hostPath:
-            path: {{ .Values.localDir }}/postgres
+            path: {{ .Values.absoluteDbPath }}/postgres
           {{- end }}
 ---
 apiVersion: v1

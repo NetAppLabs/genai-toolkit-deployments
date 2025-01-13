@@ -23,7 +23,7 @@ spec:
           {{- if not .Values.localTesting }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Chart.Version }}
           {{- else }}
-          image: localhost:5005/genai-toolkit-api:{{ .Values.devTag }}
+          image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Values.devTag }}
           {{- end }}
           imagePullPolicy: Always
           ports:
@@ -55,14 +55,14 @@ spec:
             - name: rsa-keys-volume
               mountPath: /keys/public
             {{- if ne .Values.cloudProvider "local" }}
-              {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
+              {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
                 {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
                 {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $concatString }}
               {{- end }}
             {{- else }}
-              {{- range $index, $local_dirs := (splitList "," .Values.localDir) }}
+              {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $.Values.volumesMountPoint }}/ontap/{{ (splitList "/" $local_dirs | last) }}
               {{- end }}
@@ -75,14 +75,14 @@ spec:
               - key: public_key.rsa
                 path: public_key.rsa
         {{- if ne .Values.cloudProvider "local" }}
-          {{- range $index, $nfs_volumes := (splitList "," .Values.nfs.volumes) }}
+          {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
             {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
         - name: nfs-volume-{{ $index }}
           persistentVolumeClaim:
             claimName: netapp-nfs-pvc-{{ $index }}
           {{- end }}
         {{- else }}
-          {{- range $index, $local_dirs := (splitList "," .Values.localDir) }}
+          {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
         - name: nfs-volume-{{ $index }}
           hostPath:
             path: {{ $local_dirs }}
