@@ -133,15 +133,7 @@ install_events FS_URL="default" CLOUD_PROVIDER="AZURE" LISTENER_MODE="default":
 
     components+=("${LISTENER_COMPONENT}" "function-event-distributor" "function-imageresize" "function-preprocess")
 
-    # TODO: Fix this when we have deployment for the other components
-    for component in "${components[@]}"; do
-        if ! kubectl get deployment "${component}" &> /dev/null; then
-            echo "Deploying ${component}..."
-            kubectl apply -f "${component}/k8s.yaml"
-        else
-            echo "${component} is already deployed."
-        fi
-    done
+    # TODO: Install events
 
 uninstall_events:
     #!/bin/bash
@@ -258,10 +250,25 @@ install FS_URL="default" CLOUD_PROVIDER="AZURE" MOUNT_VOLUMES="./smb-volume" LIS
     just install_genai "${FS_URL}" "${CLOUD_PROVIDER}" "${MOUNT_VOLUMES}"
     just install_events "${FS_URL}" "${CLOUD_PROVIDER}" "${LISTENER_MODE}"
 
+install_nfs_local MOUNT_VOLUMES="":
+    #!/bin/bash
+    MOUNT_VOLUMES="{{ MOUNT_VOLUMES }}"
+
+    HELM_SET_FLAGS="cloudProvider=local"
+    HELM_SET_FLAGS="${HELM_SET_FLAGS},localVolumePaths=\"${MOUNT_VOLUMES}\""
+
+    echo "Using HELM_SET_FLAGS: ${HELM_SET_FLAGS}"
+
+    helm upgrade --install genai-toolkit genai-toolkit-helmcharts --set "${HELM_SET_FLAGS}"
+
 uninstall:
     #!/bin/bash
     just uninstall_genai
     just uninstall_azurite
     just uninstall_local_smb_server
     just uninstall_events
+
+uninstall_nfs_local:
+    #!/bin/bash
+    helm uninstall genai-toolkit || true
 
