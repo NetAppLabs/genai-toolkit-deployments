@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: azurite
+  name: azurite
+spec:
+  selector:
+    matchLabels:
+      app: azurite
+  template:
+    metadata:
+      labels:
+        app: azurite
+    spec:
+      containers:
+        - image: mcr.microsoft.com/azure-storage/azurite
+          imagePullPolicy: Always
+          args:
+              - azurite
+              - '--blobHost'
+              - '0.0.0.0'
+              - '--blobPort'
+              - '10000'
+              - '--queueHost'
+              - '0.0.0.0'
+              - '--queuePort'
+              - '10001'
+              - '--tableHost'
+              - '0.0.0.0'
+              - '--tablePort'
+              - '10002'
+              - '--oauth'
+              - 'basic'
+              - '--debug'
+              - '/tmp/debug.log'
+              - '--loose'
+              - '--disableProductStyleUrl'
+          name: azurite
+          ports:
+            - containerPort: 10000
+            - containerPort: 10001
+            - containerPort: 10002
+          resources:
+            limits:
+              cpu: '0'
+              memory: '0'
+            requests:
+              cpu: '0'
+              memory: '0'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azurite-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: azurite
+  ports:
+    - protocol: TCP
+      port: 10000
+      targetPort: 10000
+      name: blob
+    - protocol: TCP
+      port: 10001
+      targetPort: 10001
+      name: queue
+    - protocol: TCP
+      port: 10002
+      targetPort: 10002
+      name: table
