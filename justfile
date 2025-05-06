@@ -139,7 +139,7 @@ uninstall_events:
     #!/bin/bash
     echo "todo uninstall events"
 
-install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VOLUMES=":./smb-volume":
+install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VOLUMES="./smb-volume":
     #!/bin/bash
 
     # Add helm repositories if missing.
@@ -215,7 +215,7 @@ install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VO
     echo "FS Protocol is ${FS_PROTOCOL}"
 
     HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
-    HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"{{ CLOUD_PROVIDER }}\""
+    HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"$CLOUD_PROVIDER\""
     if [ -n "${MOUNT_VOLUMES}" ]; then
         if [ "$FS_PROTOCOL" = "nfs" ]; then
             HELM_SET_FLAGS="${HELM_SET_FLAGS},nfs.volumes=\"$MOUNT_VOLUMES\""
@@ -232,7 +232,7 @@ install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VO
 uninstall_genai:
     helm uninstall genai-toolkit || true
 
-install FS_URL="default" CLOUD_PROVIDER="AZURE" MOUNT_VOLUMES="./smb-volume" LISTENER_MODE="default":
+install FS_URL="default" CLOUD_PROVIDER="AZURE" MOUNT_VOLUMES="" LISTENER_MODE="default":
     #!/bin/bash
     FS_URL="{{ FS_URL }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
