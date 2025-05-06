@@ -4,6 +4,7 @@ default:
     @just -l
 
 LOCALDIR := `sh -c 'pwd'`
+RUNTIME := `sh -c "if [ \"\$(kubectl get nodes --no-headers | awk '{print \$1}')\" = 'orbstack' ]; then echo orbstack; else echo docker-desktop; fi"`
 
 # Optional parameters: smb_user, smb_pass, smb_port
 install_local_smb_server local_volume_path="./smb-volume" smb_user="smbuser" smb_pass="mypass" smb_port="30445":
@@ -109,14 +110,14 @@ install_azurite:
 uninstall_azurite:
     #!/bin/bash
     cd azurite
-    kubectl delete -f azurite-k8s.yaml || true
+    kubectl delete -f azurite-k8s.yaml --ignore-not-found || true
 
 
-install_events FS_URL="default" CLOUD_PROVIDER="AZURE":
+install_events FS_URL="default" CLOUD_PROVIDER="AZURE" LISTENER_MODE="default":
     #!/bin/bash
     FS_URL="{{ FS_URL }}"
 
-    LISTENER_MODE="default"
+    LISTENER_MODE="{{ LISTENER_MODE }}"
     if [[ "${LISTENER_MODE}" == "SMB" ]]; then
         SMB_URL="{{FS_URL}}"
         echo "Received SMB_URL: $SMB_URL"
@@ -130,58 +131,121 @@ install_events FS_URL="default" CLOUD_PROVIDER="AZURE":
         LISTENER_COMPONENT="fs-events-server"
     fi
 
-    echo "todo install events"
+    components+=("${LISTENER_COMPONENT}" "function-event-distributor" "function-imageresize" "function-preprocess")
+
+    # TODO: Fix this when we have deployment for the other components
+    for component in "${components[@]}"; do
+        if ! kubectl get deployment "${component}" &> /dev/null; then
+            echo "Deploying ${component}..."
+            kubectl apply -f "${component}/k8s.yaml"
+        else
+            echo "${component} is already deployed."
+        fi
+    done
 
 uninstall_events:
     #!/bin/bash
     echo "todo uninstall events"
 
-install_genai FS_URL="default" CLOUD_PROVIDER="AZURE":
+install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VOLUMES=":./smb-volume":
     #!/bin/bash
-    # SMB csi driver
+
+    # Add helm repositories if missing.
+    if ! helm repo list | grep -q 'keycloak'; then
+        helm repo add keycloak https://codecentric.github.io/helm-charts
+    fi
+
+    if ! helm repo list | grep -q 'searxng'; then
+        helm repo add searxng https://charts.searxng.org
+    fi
+
+    # Install SMB CSI driver if missing.
     if ! helm list -n kube-system | grep -q 'csi-driver-smb'; then
         helm repo add csi-driver-smb https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
         helm install csi-driver-smb csi-driver-smb/csi-driver-smb --namespace kube-system --version v1.16.0
     fi
+
+    missing_deps=$(helm dependency list genai-toolkit-helmcharts | grep missing)
+    if [ -n "${missing_deps}" ]; then
+        helm dependency build genai-toolkit-helmcharts
+    fi
+
+    # Retrieve parameter values (these may be provided by Just’s templating).
     FS_URL="{{ FS_URL }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
-    CLOUD_PROVIDER_LOWER="$(echo "$CLOUD_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+    apiv2_secret_store="kubernetes"
+    volumes="{{ MOUNT_VOLUMES }}"
 
-    # TODO change default to smb
-    FS_PROTOCOL="nfs"
-    # TODO remove dummy temporary value
-    MOUNT_VOLUMES="1.2.3.4:/export1"
+    IFS=';' read -r -a share_names <<< "$volumes"
+
+    # Determine RUNTIME-dependent variables.
+    RUNTIME="{{ RUNTIME }}"
+    if [ "${RUNTIME}" = "orbstack" ]; then
+        node_ip="$(kubectl get nodes -o wide --no-headers | head -n1 | awk '{print $6}')"
+    else
+        node_ip="localhost"
+    fi
+    if [ "${RUNTIME}" = "orbstack" ]; then
+        smb_port="$(kubectl get svc smb-server -o jsonpath='{.spec.ports[?(@.name=="smb-server")].nodePort}')"
+    else
+        smb_port="445"
+    fi
+
+    FS_PROTOCOL="{{ FS_PROTOCOL }}"
+    MOUNT_VOLUMES="{{ MOUNT_VOLUMES }}"
+
+    # Process FS_URL to prepare volume mount strings.
     if [[ $FS_URL == smb:* ]]; then
         FS_PROTOCOL="smb"
-        #TODO parse MOUNT_VOLUMES
-        #TODO translate smb://smbuser:smbpass@1.2.3.4:30445/smb-volume to //1.2.3.4:30445/smb-volume
-        #TODO handle smbcreds
+        connection_strings="{{ FS_URL }}"
+    elif [[ $FS_URL == default ]]; then
+        FS_PROTOCOL="smb"
+        connection_strings=""
+        smb_user="smbuser"
+        smb_pass="mypass"
+
+        for share_name in "${share_names[@]}"; do
+            # Build connection string using shell variables.
+            connection_string="smb://${smb_user}:${smb_pass}@${node_ip}:${smb_port}/$(basename "$share_name")?sec=ntlmssp"
+            if [ -z "$connection_strings" ]; then
+                connection_strings="$connection_string"
+            else
+                connection_strings="$connection_strings;$connection_string"
+            fi
+        done
     elif [[ $FS_URL == nfs:* ]]; then
         FS_PROTOCOL="nfs"
-        #TODO parse MOUNT_VOLUMES from FS_URL
-        #TODO translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
+        # translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
+        converted_mount_volumes=$(echo "$MOUNT_VOLUMES" | sed -e 's|nfs://||' -e 's|/|:|')
+        MOUNT_VOLUMES="$converted_mount_volumes"
     fi
+
     echo "FS Protocol is ${FS_PROTOCOL}"
 
-    # TODO check if cloudProvider should still be anf for azure
-    if [[ "${CLOUD_PROVIDER_LOWER}" == "azure" ]]; then
-        CLOUD_PROVIDER_LOWER="anf"
-    fi
-    HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER_LOWER\""
+    HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
+    HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"{{ CLOUD_PROVIDER }}\""
     if [ -n "${MOUNT_VOLUMES}" ]; then
-        HELM_SET_FLAGS="${HELM_SET_FLAGS},${FS_PROTOCOL}.volumes=\"${MOUNT_VOLUMES}\""
+        if [ "$FS_PROTOCOL" = "nfs" ]; then
+            HELM_SET_FLAGS="${HELM_SET_FLAGS},nfs.volumes=\"$MOUNT_VOLUMES\""
+        else
+            HELM_SET_FLAGS="${HELM_SET_FLAGS},smbVolumes=\"$connection_strings\""
+        fi
     fi
 
-    helm upgrade --install genai-toolkit genai-toolkit-helmcharts --set-json ${HELM_SET_FLAGS}
+    echo "HELM_SET_FLAGS: ${HELM_SET_FLAGS}"
 
+    # Perform the helm upgrade/install (ensure the chart reference is correct).
+    helm upgrade --install genai-toolkit genai-toolkit-helmcharts --set-json "${HELM_SET_FLAGS}"
 
 uninstall_genai:
     helm uninstall genai-toolkit || true
 
-install FS_URL="default" CLOUD_PROVIDER="AZURE":
+install FS_URL="default" CLOUD_PROVIDER="AZURE" MOUNT_VOLUMES="./smb-volume" LISTENER_MODE="default":
     #!/bin/bash
     FS_URL="{{ FS_URL }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
+    MOUNT_VOLUMES="{{ MOUNT_VOLUMES }}"
+    LISTENER_MODE="{{ LISTENER_MODE }}"
 
     if [[ "${FS_URL}" == "default" ]]; then
         echo "FS_URL is default -- assuming local emulated setup"
@@ -191,8 +255,8 @@ install FS_URL="default" CLOUD_PROVIDER="AZURE":
         just install_local_smb_server
     fi
 
-    just install_genai "${FS_URL}" "${CLOUD_PROVIDER}"
-    just install_events "${FS_URL}" "${CLOUD_PROVIDER}"
+    just install_genai "${FS_URL}" "${CLOUD_PROVIDER}" "${MOUNT_VOLUMES}"
+    just install_events "${FS_URL}" "${CLOUD_PROVIDER}" "${LISTENER_MODE}"
 
 uninstall:
     #!/bin/bash
