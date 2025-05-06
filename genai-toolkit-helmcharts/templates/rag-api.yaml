@@ -40,7 +40,7 @@ spec:
             - name: JWT_SECRET_KEY
               value: "whatever"
             - name: DB_CONNECTION_STRING
-              value: {{ if .Values.db.connectionString }}
+              value:  {{ if .Values.db.connectionString }}
                         {{ .Values.db.connectionString | quote }}
                       {{ else }}
                         {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
@@ -51,8 +51,16 @@ spec:
               value: /auth
             - name: KEYCLOAK_REALM
               value: genai-toolkit
-          {{- if .Values.smbVolumes }}
           volumeMounts:
+          {{- if ne .Values.cloudProvider "local" }}
+            {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
+              {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+              {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
+          - name: nfs-volume-{{ $index }}
+            mountPath: {{ $concatString }}
+            {{- end }}
+          {{- else }}
+            {{- if .Values.smbVolumes }}
               {{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
                 {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
                 {{- $new_parts := splitList "?" (last $volume_parts)}}
@@ -61,13 +69,37 @@ spec:
             - name: smb-volume-{{ $index }}
               mountPath: {{ $volume_mount_point }}
               {{- end }}
+            {{- else }}
+              {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+            - name: nfs-volume-{{ $index }}
+              mountPath: {{ $.Values.volumesMountPoint }}/ontap/{{ (splitList "/" $local_dirs | last) }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
       volumes:
-        {{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
+      {{- if ne .Values.cloudProvider "local" }}
+        {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
+          {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+      - name: nfs-volume-{{ $index }}
+        persistentVolumeClaim:
+          claimName: netapp-nfs-pvc-{{ $index }}
+        {{- end }}
+      {{- else }}
+        {{- if .Values.smbVolumes }}
+          {{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
         - name: smb-volume-{{ $index }}
           persistentVolumeClaim:
             claimName: netapp-smb-volume-pvc-{{ $index }}
+          {{- end }}
+        {{- else }}
+          {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+        - name: nfs-volume-{{ $index }}
+          hostPath:
+            path: {{ $local_dirs }}
+          {{- end }}
         {{- end }}
-        {{- end }}
+      {{- end }}
+
 ---
 apiVersion: v1
 kind: Service
