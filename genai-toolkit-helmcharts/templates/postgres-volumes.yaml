@@ -1,4 +1,4 @@
-{{- if (and (eq .Values.db.connectionString "") (not .Values.localTesting)) }}
+{{- if (and (eq .Values.db.connectionString "") (not .Values.absoluteDbPath)) }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:

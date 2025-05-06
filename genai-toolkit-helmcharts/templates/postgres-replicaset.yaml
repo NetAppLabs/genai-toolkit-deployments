@@ -18,7 +18,7 @@ spec:
       containers:
         - name: postgres
           image: pgvector/pgvector:pg16
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
           env:
@@ -35,7 +35,7 @@ spec:
               name: postgres-storage
       volumes:
         - name: postgres-storage
-          {{- if not .Values.localTesting }}
+          {{- if not .Values.absoluteDbPath }}
           persistentVolumeClaim:
             claimName: pvc-postgres
           {{- else }}
