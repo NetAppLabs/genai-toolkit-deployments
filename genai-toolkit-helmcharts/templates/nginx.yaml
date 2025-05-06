@@ -14,18 +14,14 @@ spec:
       labels:
         app: genai-toolkit-nginx
     spec:
-      initContainers:
-        - name: wait-for-auth
-          image: busybox
-          command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-rag-api.{{ .Release.Namespace }}.svc.cluster.local:8002/health; do echo waiting for genai-toolkit-rag-api; sleep 2; done']
       containers:
         - name: genai-toolkit-nginx
-          {{- if not .Values.localTesting }}
+          {{- if not .Values.devTag }}
           image: {{ .Values.dockerRegistry }}nginx:{{ .Chart.Version }}
           {{- else }}
-          image: {{ .Values.dockerRegistry }}genai-toolkit-nginx:{{ .Values.devTag }}
+          image: {{ .Values.dockerRegistry }}nginx:{{ .Values.devTag }}
           {{- end }}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
             - containerPort: 443
