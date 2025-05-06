@@ -108,6 +108,14 @@ spec:
               mountPath: /app/kubernetes/files/genai-toolkit-realm.json
               subPath: genai-toolkit-realm.json
               readOnly: true
+          {{- if ne .Values.cloudProvider "local" }}
+            {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
+              {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+              {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
+          - name: nfs-volume-{{ $index }}
+            mountPath: {{ $concatString }}
+            {{- end }}
+          {{- else }}
             {{- if .Values.smbVolumes }}
               {{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
                 {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
@@ -117,18 +125,39 @@ spec:
             - name: volume-{{ $index }}
               mountPath: {{ $volume_mount_point }}
               {{- end }}
+            {{- else }}
+              {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+            - name: nfs-volume-{{ $index }}
+              mountPath: {{ $.Values.volumesMountPoint }}/ontap/{{ (splitList "/" $local_dirs | last) }}
+              {{- end }}
             {{- end }}
+          {{- end }}
       volumes:
         - name: keycloak-realm-json
           secret:
             secretName: {{ .Release.Name }}-realm-secret
+      {{- if ne .Values.cloudProvider "local" }}
+        {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
+          {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+      - name: nfs-volume-{{ $index }}
+        persistentVolumeClaim:
+          claimName: netapp-nfs-pvc-{{ $index }}
+        {{- end }}
+      {{- else }}
         {{- if .Values.smbVolumes }}
           {{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
         - name: volume-{{ $index }}
           persistentVolumeClaim:
             claimName: netapp-smb-volume-pvc-{{ $index }}
           {{- end }}
+        {{- else }}
+          {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+        - name: nfs-volume-{{ $index }}
+          hostPath:
+            path: {{ $local_dirs }}
+          {{- end }}
         {{- end }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service
