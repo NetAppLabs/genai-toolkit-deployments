@@ -52,19 +52,19 @@ spec:
               value: genai-toolkit
             - name: KEYCLOAK_EXPOSED_HOST
               value: http://localhost
-              {{- if .Values.localDev }}
+            {{- if .Values.localDev }}
             - name: KEYCLOAK_CLIENT_SECRET
               value: super-secret-password
-              {{- else }}
+            {{- else }}
             - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: client-secret
                   key: CLIENT_SECRET
-              {{- end }}
+            {{- end }}
             - name: KEYCLOAK_CLIENT_ID
               value: genai-toolkit-client
-            {{- if .Values.aws}}
+            {{- if .Values.aws }}
             - name: AWS_REGION
               value: "{{ .Values.aws.region }}"
             - name: AWS_ACCESS_KEY_ID
@@ -79,7 +79,7 @@ spec:
             - name: CLOUD_ENV
               value: "{{ .Values.apiv2.cloudEnv }}"
             - name: API_KEY_LIFETIME_DAYS
-              value: "{{ .Values.apiv2.apiKeyLifetimeDays }}"            
+              value: "{{ .Values.apiv2.apiKeyLifetimeDays }}"
             - name: TOOLKIT_VERSION
               value: {{ .Chart.Version | quote }}
             {{- if .Values.smbVolumes }}
@@ -87,14 +87,14 @@ spec:
               value: {{ $allConcatStrings := "" -}}
                 {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smbVolumes) }}
                   {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
-                    {{- $new_parts := splitList "?" (last $volume_parts)}}
-                  {{- $concatString :=  printf "%s;/%s/%s" $smb_volume_connection_string $.Values.cloudStorageProvider (index $new_parts 0)}}
+                  {{- $new_parts := splitList "?" (last $volume_parts) }}
+                  {{- $concatString :=  printf "%s;/%s/%s" $smb_volume_connection_string $.Values.cloudStorageProvider (index $new_parts 0) }}
                   {{- $allConcatStrings = printf "%s%s__" $allConcatStrings $concatString -}}
                 {{- end -}}
                 {{- $allConcatStrings | trimSuffix "__" }}
             {{- else if .Values.apiv2.volumeMapping }}
             - name: APIV2_VOLUME_MAPPING
-              value: {{ .Values.apiv2.volumeMapping -}}
+              value: {{ .Values.apiv2.volumeMapping }}
             {{- end }}
           livenessProbe:
             httpGet:
@@ -108,56 +108,55 @@ spec:
               mountPath: /app/kubernetes/files/genai-toolkit-realm.json
               subPath: genai-toolkit-realm.json
               readOnly: true
-          {{- if ne .Values.cloudProvider "local" }}
-            {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
-              {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
-              {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
-          - name: nfs-volume-{{ $index }}
-            mountPath: {{ $concatString }}
-            {{- end }}
-          {{- else }}
-            {{- if .Values.smbVolumes }}
-              {{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
-                {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
-                {{- $new_parts := splitList "?" (last $volume_parts)}}
-                {{- $volume_mount_point := "" }}
-                    {{- $volume_mount_point = printf "%s/%s/%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $new_parts 0)}}
-            - name: volume-{{ $index }}
-              mountPath: {{ $volume_mount_point }}
+            {{- if and (ne .Values.apiv2.cloudEnv "local") (gt (len .Values.nfs.volumes) 0) }}
+              {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
+                {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+                {{- $concatString := printf "%s/%s%s" $.Values.volumesMountPoint $.Values.apiv2.cloudEnv (index $nfs_volume_parts 1) }}
+            - name: nfs-volume-{{ $index }}
+              mountPath: {{ $concatString }}
               {{- end }}
             {{- else }}
-              {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+              {{- if .Values.smbVolumes }}
+                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smbVolumes) }}
+                  {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
+                  {{- $new_parts := splitList "?" (last $volume_parts) }}
+                  {{- $volume_mount_point := printf "%s/%s/%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $new_parts 0) }}
+            - name: volume-{{ $index }}
+              mountPath: {{ $volume_mount_point }}
+                {{- end }}
+              {{- else if gt (len .Values.localVolumePaths) 0 }}
+                {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $.Values.volumesMountPoint }}/ontap/{{ (splitList "/" $local_dirs | last) }}
+                {{- end }}
               {{- end }}
             {{- end }}
-          {{- end }}
       volumes:
         - name: keycloak-realm-json
           secret:
             secretName: {{ .Release.Name }}-realm-secret
-      {{- if ne .Values.cloudProvider "local" }}
-        {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
-          {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
-      - name: nfs-volume-{{ $index }}
-        persistentVolumeClaim:
-          claimName: netapp-nfs-pvc-{{ $index }}
-        {{- end }}
-      {{- else }}
-        {{- if .Values.smbVolumes }}
-          {{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
+        {{- if and (ne .Values.apiv2.cloudEnv "local") (gt (len .Values.nfs.volumes) 0) }}
+          {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
+            {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
+        - name: nfs-volume-{{ $index }}
+          persistentVolumeClaim:
+            claimName: netapp-nfs-pvc-{{ $index }}
+          {{- end }}
+        {{- else }}
+          {{- if .Values.smbVolumes }}
+            {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smbVolumes) }}
         - name: volume-{{ $index }}
           persistentVolumeClaim:
             claimName: netapp-smb-volume-pvc-{{ $index }}
-          {{- end }}
-        {{- else }}
-          {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+            {{- end }}
+          {{- else if gt (len .Values.localVolumePaths) 0 }}
+            {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
         - name: nfs-volume-{{ $index }}
           hostPath:
             path: {{ $local_dirs }}
+            {{- end }}
           {{- end }}
         {{- end }}
-      {{- end }}
 ---
 apiVersion: v1
 kind: Service

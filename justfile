@@ -254,8 +254,13 @@ install_nfs_local MOUNT_VOLUMES="":
     #!/bin/bash
     MOUNT_VOLUMES="{{ MOUNT_VOLUMES }}"
 
-    HELM_SET_FLAGS="cloudProvider=local"
-    HELM_SET_FLAGS="${HELM_SET_FLAGS},localVolumePaths=\"${MOUNT_VOLUMES}\""
+    if [ -z "${MOUNT_VOLUMES}" ]; then
+      echo "Error: MOUNT_VOLUMES is not set. Please set MOUNT_VOLUMES to a valid path."
+      exit 1
+    fi
+
+    HELM_SET_FLAGS="apiv2.cloudEnv=local"
+    HELM_SET_FLAGS="${HELM_SET_FLAGS},localVolumePaths=${MOUNT_VOLUMES}"
 
     echo "Using HELM_SET_FLAGS: ${HELM_SET_FLAGS}"
 
