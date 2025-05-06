@@ -1,0 +1,61 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smb-server
+  namespace: default
+  labels:
+    app: smb-server
+spec:
+  type: LoadBalancer
+  selector:
+    app: smb-server
+  ports:
+    - port: 445
+      name: smb-server
+      nodePort: ${SMB_445_NODE_PORT}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smb-server
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smb-server
+  template:
+    metadata:
+      name: smb-server
+      labels:
+        app: smb-server
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": linux
+      containers:
+      - name: smb-server
+        image: andyzhangx/samba:win-fix
+        env:
+          - name: PERMISSIONS
+            value: "0777"
+          - name: USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: smbcreds
+                key: username
+          - name: PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: smbcreds
+                key: password
+        args:
+          - "-u"
+          - "$(USERNAME);$(PASSWORD)"
+${SMB_SHARES}
+          - "-p"
+        volumeMounts:
+${VOLUME_MOUNTS}
+      volumes:
+${VOLUMES}
