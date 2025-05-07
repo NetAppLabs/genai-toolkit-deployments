@@ -1,0 +1,64 @@
+# Default values for smb-listener
+
+cloudProvider: AZURE
+
+smb:
+  url: ""
+  listenerRetries: 10
+
+azure:
+  aqsConnectionString: UseDevelopmentStorage=true
+
+aws:
+  region: eu-west-1
+  sqsQueueUrl: ""
+  sqsMessageGroupId: ""
+  iam: true
+
+nats:
+  url: ""
+  subject: ""
+
+# This sets the smb-listener container image
+image:
+  repository: ghcr.io/netapplabs/smb-listener
+  pullPolicy: IfNotPresent
+  tag: latest
+
+# Define the resources you'd like to request for smb-listener
+resources:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+replicaCount: 1
+
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets:
+  - name: nlghcr
+
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  annotations: { }
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: { }
+podLabels: { }
+podSecurityContext: { }
+securityContext: { }
+volumeMounts: { }
+volumes: { }
+nodeSelector: { }
+tolerations: [ ]
+affinity: { }
