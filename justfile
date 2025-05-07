@@ -365,14 +365,18 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE":
                 share_name=$(echo ${share_name_upper} | tr '[:upper:]' '[:lower:]')
                 smb_user="smbuser"
                 smb_pass="mypass"
-                smb_port="445"
+                smb_port=""
+                smb_port_if_any_with_colon=""
                 #if [ "${RUNTIME}" = "orbstack" ]; then
                 #    smb_port="$(kubectl get svc smb-server -o jsonpath='{.spec.ports[?(@.name=="smb-server")].nodePort}')"
                 #else
                 #    smb_port="445"
                 #fi
+                if [ -n "${smb_port} "]; then
+                    smb_port_if_any_with_colon=":${smb_port}"
+                fi
                 smb_server="smb-server.default.svc.cluster.local"
-                FS_URL="smb://${smb_user}:${smb_pass}@${smb_server}:${smb_port}/${share_name}?sec=ntlmssp"
+                FS_URL="smb://${smb_user}:${smb_pass}@${smb_server}${smb_port_if_any_with_colon}/${share_name}?sec=ntlmssp"
             fi
 
 
