@@ -163,7 +163,6 @@ install_events FS_URLS="default" CLOUD_PROVIDER="AZURE":
 
     config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
     SMB_URLS=$(echo ${config_json} | jq -c '.volumes[] | select(.access[].protocol=="smb") | .access[].url' | jq -s | tr -d "\n\r" | tr -d '[:blank:]' )
-    echo ""
     if [ "${SMB_URLS}" != "[]" ]; then
         HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER\""
         if [ -n "${SMB_URLS}" ]; then
@@ -191,7 +190,11 @@ install_events FS_URLS="default" CLOUD_PROVIDER="AZURE":
         HELM_SET_FLAGS="${HELM_SET_FLAGS},nats.subject=\"${NATS_SUBJECT}\""
         fi
 
+        echo ""
+        echo "===== Installing helm chart for smb-listener ====="
         helm upgrade --install smb-listener smb-listener --set-json ${HELM_SET_FLAGS}
+        echo "=================================================="
+        echo ""
 
     else
         echo "no SMB volumes founds, skipping smb-listener"
@@ -259,7 +262,11 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
     fi
 
     # Perform the helm upgrade/install (ensure the chart reference is correct).
+    echo ""
+    echo "===== Installing helm chart for genai-toolkit ====="
     helm upgrade --install genai-toolkit genai-toolkit-helmcharts --set-json "${HELM_SET_FLAGS}"
+    echo "==================================================="
+    echo ""
 
 uninstall_genai:
     helm uninstall genai-toolkit || true
