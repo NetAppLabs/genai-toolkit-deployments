@@ -69,7 +69,8 @@ install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pas
                 SMB_PATH="{{ LOCALDIR }}/$volume_path"
             fi
 
-            SMB_SHARE_NAME=$(basename "$SMB_PATH")
+            SMB_SHARE_NAME_UPPER=$(basename "$SMB_PATH")
+            SMB_SHARE_NAME=$(echo ${SMB_SHARE_NAME_UPPER} | tr '[:upper:]' '[:lower:]')
 
             SMB_SHARES="${SMB_SHARES}
               - \"-s\"
@@ -353,7 +354,8 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE":
                     mkdir -p ${absolute_local_path}
                 fi
 
-                share_name=$(basename "$absolute_local_path")
+                share_name_upper=$(basename "$absolute_local_path")
+                share_name=$(echo ${share_name_upper} | tr '[:upper:]' '[:lower:]')
                 smb_user="smbuser"
                 smb_pass="mypass"
                 smb_port="445"
