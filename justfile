@@ -359,11 +359,15 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
             share_name="$(echo $url | grep / | cut -d/ -f2- | awk -F '?' '{print $1}')"
             FS_PROTOCOL="$(echo $proto | awk -F ':' '{print $1}')"
 
+            port_with_colon_if_any=""
+            if [ -n "${port}" ]; then
+                port_with_colon_if_any=":${port}"
+            fi
             if [[ $FS_URL == smb:* ]]; then
-                connection_string="//${host}/${share_name}"
+                connection_string="//${host}${port_with_colon_if_any}/${share_name}"
             elif [[ $FS_URL == nfs:* ]]; then
                 # translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
-                connection_string=$(echo "$FS_URL" | sed -e 's|nfs://||' -e 's|/|:|')
+                connection_string=$(echo "$FS_URL" | sed -e 's|nfs://||' -e 's|/|:/|')
             fi
             if [ $IS_FIRST -eq 0 ]; then
                 echo -e ",\n" >> ${CONFIG_FILE}
