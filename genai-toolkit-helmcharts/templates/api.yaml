@@ -108,10 +108,10 @@ spec:
               mountPath: /app/kubernetes/files/genai-toolkit-realm.json
               subPath: genai-toolkit-realm.json
               readOnly: true
-            {{- if and (ne .Values.apiv2.cloudEnv "local") (gt (len .Values.nfs.volumes) 0) }}
+            {{- if (gt (len .Values.nfs.volumes) 0) }}
               {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
                 {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
-                {{- $concatString := printf "%s/%s%s" $.Values.volumesMountPoint $.Values.apiv2.cloudEnv (index $nfs_volume_parts 1) }}
+                {{- $concatString := printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $nfs_volume_parts 1) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $concatString }}
               {{- end }}
@@ -135,7 +135,7 @@ spec:
         - name: keycloak-realm-json
           secret:
             secretName: {{ .Release.Name }}-realm-secret
-        {{- if and (ne .Values.apiv2.cloudEnv "local") (gt (len .Values.nfs.volumes) 0) }}
+        {{- if (gt (len .Values.nfs.volumes) 0) }}
           {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
             {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
         - name: nfs-volume-{{ $index }}

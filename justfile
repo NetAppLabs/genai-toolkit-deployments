@@ -10,22 +10,27 @@ check_requirements:
     #!/bin/bash
     if ! command -v kubectl 2>&1 > /dev/null; then
         echo "please install kubectl"
+        echo "  e.g. brew install kubernetes-cli"
         exit 1
     fi
     if ! command -v helm 2>&1 > /dev/null; then
         echo "please install helm"
+        echo "  e.g. brew install helm"
         exit 1
     fi
     if ! command -v jq 2>&1 > /dev/null; then
         echo "please install jq"
+        echo "  e.g. brew install jq"
         exit 1
     fi
         if ! command -v yq 2>&1 > /dev/null; then
         echo "please install yq"
+        echo "  e.g. brew install yq"
         exit 1
     fi
     if ! command -v envsubst 2>&1 > /dev/null; then
         echo "please install gettext/envsubst"
+        echo "  e.g. brew install gettext"
         exit 1
     fi
 
@@ -33,6 +38,7 @@ check_requirements:
 # Optional parameters: smb_user, smb_pass, smb_port
 install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pass="mypass" smb_port="30445":
     #!/bin/bash
+    set -e
     smb_user="{{ smb_user }}"
     smb_pass="{{ smb_pass }}"
     smb_port="{{ smb_port }}"
@@ -147,6 +153,7 @@ uninstall_azurite:
 
 install_events FS_URLS="default" CLOUD_PROVIDER="AZURE":
     #!/bin/bash
+    set -e
 
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     FS_URLS="{{ FS_URLS }}"
@@ -183,8 +190,8 @@ install_events FS_URLS="default" CLOUD_PROVIDER="AZURE":
         HELM_SET_FLAGS="${HELM_SET_FLAGS},nats.subject=\"${NATS_SUBJECT}\""
         fi
 
-        echo "Starting up SMB Listener with SMB_URLS: ${SMB_URLS}"
         helm upgrade --install smb-listener smb-listener --set-json ${HELM_SET_FLAGS}
+
     else
         echo "no SMB volumes founds, skipping smb-listener"
     fi
@@ -196,6 +203,7 @@ uninstall_events:
 
 install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
     #!/bin/bash
+    set -e
 
     # Add helm repositories if missing.
     if ! helm repo list | grep -q 'keycloak'; then
@@ -212,7 +220,7 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
         helm install csi-driver-smb csi-driver-smb/csi-driver-smb --namespace kube-system --version v1.16.0
     fi
 
-    missing_deps=$(helm dependency list genai-toolkit-helmcharts | grep missing)
+    missing_deps=$(helm dependency list genai-toolkit-helmcharts | grep missing || true)
     if [ -n "${missing_deps}" ]; then
         helm dependency build genai-toolkit-helmcharts
     fi
@@ -225,17 +233,12 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
     IFS=';' read -r -a share_names <<< "$volumes"
 
     # Determine RUNTIME-dependent variables.
-    RUNTIME="{{ RUNTIME }}"
-    if [ "${RUNTIME}" = "orbstack" ]; then
-        node_ip="$(kubectl get nodes -o wide --no-headers | head -n1 | awk '{print $6}')"
-    else
-        node_ip="localhost"
-    fi
-    if [ "${RUNTIME}" = "orbstack" ]; then
-        smb_port="$(kubectl get svc smb-server -o jsonpath='{.spec.ports[?(@.name=="smb-server")].nodePort}')"
-    else
-        smb_port="445"
-    fi
+    # RUNTIME="{{ RUNTIME }}"
+    # if [ "${RUNTIME}" = "orbstack" ]; then
+    #     node_ip="$(kubectl get nodes -o wide --no-headers | head -n1 | awk '{print $6}')"
+    # else
+    #     node_ip="localhost"
+    # fi
 
     FS_URLS="{{ FS_URLS }}"
     FS_PROTOCOL="smb"
@@ -246,15 +249,13 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
     smb_connection_strings=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="smb") | .access[].connectionString] | join(";")')
 
     HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
-    HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"$CLOUD_PROVIDER\""
+    #HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"$CLOUD_PROVIDER\""
     if [ -n "${nfs_connection_strings}" ]; then
         HELM_SET_FLAGS="${HELM_SET_FLAGS},nfs.volumes=\"$nfs_connection_strings\""
     fi
     if [ -n "${smb_connection_strings}" ]; then
         HELM_SET_FLAGS="${HELM_SET_FLAGS},smb.volumes=\"$smb_connection_strings\""
     fi
-
-    echo "HELM_SET_FLAGS: ${HELM_SET_FLAGS}"
 
     # Perform the helm upgrade/install (ensure the chart reference is correct).
     helm upgrade --install genai-toolkit genai-toolkit-helmcharts --set-json "${HELM_SET_FLAGS}"
@@ -266,7 +267,7 @@ install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
     FS_URLS="{{ FS_URLS }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
-    just create_setupconfig "${FS_URLS}" "${CLOUD_PROVIDER}"
+    just configure "${FS_URLS}" "${CLOUD_PROVIDER}"
 
     config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
     IS_LOCAL=$(echo ${config_json} | jq -r .isLocal)
@@ -282,8 +283,10 @@ install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     just install_events "${FS_URLS}" "${CLOUD_PROVIDER}"
 
 
-create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
+configure FS_URLS="default" CLOUD_PROVIDER="AZURE":
     #!/bin/bash
+    # Setting up configmap with config
+    # auto populating if not present
     FS_URLS="{{ FS_URLS }}"
     LOCALDIR="{{ LOCALDIR }}"
     # Process FS_URLS to prepare volume config.
@@ -298,7 +301,7 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
         CONFIG_FILE_EXISTS=1
     fi
 
-    if [ ${CONFIG_FILE_EXISTS} -eq 0 ]; then
+    if [ ${CONFIG_FILE_EXISTS} -eq 0 ] && [ ${CONFIG_MAP_EXISTS} -eq 0 ]; then
         CONFIG_FILE_ORIG="${CONFIG_FILE}"
         CONFIG_FILE="${CONFIG_FILE_ORIG}.json"
         echo "config file does not exist - creating it"
@@ -354,6 +357,11 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
                 smb_user="smbuser"
                 smb_pass="mypass"
                 smb_port="445"
+                #if [ "${RUNTIME}" = "orbstack" ]; then
+                #    smb_port="$(kubectl get svc smb-server -o jsonpath='{.spec.ports[?(@.name=="smb-server")].nodePort}')"
+                #else
+                #    smb_port="445"
+                #fi
                 smb_server="smb-server.default.svc.cluster.local"
                 FS_URL="smb://${smb_user}:${smb_pass}@${smb_server}:${smb_port}/${share_name}?sec=ntlmssp"
             fi

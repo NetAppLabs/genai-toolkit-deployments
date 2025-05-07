@@ -1,4 +1,4 @@
-{{- if .Values.nfsVolumes }}
+{{- if .Values.nfs.volumes }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

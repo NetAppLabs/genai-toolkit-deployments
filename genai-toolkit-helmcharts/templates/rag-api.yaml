@@ -52,10 +52,10 @@ spec:
             - name: KEYCLOAK_REALM
               value: genai-toolkit
           volumeMounts:
-            {{- if and (ne .Values.apiv2.cloudEnv "local") (gt (len .Values.nfs.volumes) 0) }}
+            {{- if .Values.nfs.volumes }}
               {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
                 {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
-                {{- $concatString := printf "%s/%s%s" $.Values.volumesMountPoint $.Values.apiv2.cloudEnv (index $nfs_volume_parts 1) }}
+                {{- $concatString := printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $nfs_volume_parts 1) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $concatString }}
               {{- end }}
@@ -76,7 +76,7 @@ spec:
               {{- end }}
             {{- end }}
       volumes:
-        {{- if and (ne .Values.apiv2.cloudEnv "local") (gt (len .Values.nfs.volumes) 0) }}
+        {{- if .Values.nfs.volumes }}
           {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
             {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
         - name: nfs-volume-{{ $index }}
