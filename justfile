@@ -8,19 +8,23 @@ RUNTIME := `sh -c "if [ \"\$(kubectl get nodes --no-headers | awk '{print \$1}')
 
 check_requirements:
     #!/bin/bash
-    if ! command -v kubectl 2>&1 ; then
+    if ! command -v kubectl 2>&1 > /dev/null; then
         echo "please install kubectl"
         exit 1
     fi
-    if ! command -v helm 2>&1 ; then
+    if ! command -v helm 2>&1 > /dev/null; then
         echo "please install helm"
         exit 1
     fi
-    if ! command -v jq 2>&1 ; then
+    if ! command -v jq 2>&1 > /dev/null; then
         echo "please install jq"
         exit 1
     fi
-    if ! command -v envsubst 2>&1 ; then
+        if ! command -v yq 2>&1 > /dev/null; then
+        echo "please install yq"
+        exit 1
+    fi
+    if ! command -v envsubst 2>&1 > /dev/null; then
         echo "please install gettext/envsubst"
         exit 1
     fi
@@ -32,10 +36,9 @@ install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pas
     smb_user="{{ smb_user }}"
     smb_pass="{{ smb_pass }}"
     smb_port="{{ smb_port }}"
-    CONFIG_FILE="$(pwd)/genaiconfig.json"
-    local_volume_paths=$(cat ${CONFIG_FILE} | jq -c -r '[.volumes[] | select(.protocol=="smb") | .localPath] | join(",")')
+    config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
+    local_volume_paths=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="smb") | .access[].localPath] | join(",")')
 
-    echo "Done with local_volume_paths: ${local_volume_paths}"
     if [ "${local_volume_paths}" != "" ]; then
 
         # Split the paths into an array
@@ -100,8 +103,6 @@ install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pas
 
         # Apply the YAML that uses $SMB_SHARES, $VOLUME_MOUNTS, and $VOLUMES
         envsubst '$SMB_SHARES $VOLUME_MOUNTS $VOLUMES $SMB_445_NODE_PORT' < smb-server/smb-server-deployment.yaml | kubectl apply -f -
-        #envsubst '$SMB_SHARES $VOLUME_MOUNTS $VOLUMES $SMB_445_NODE_PORT' < smb-server/smb-server-deployment.yaml > /tmp/smbserver.yaml
-        #cat /tmp/smbserver.yaml | kubectl apply -f -
 
         # Check if the SMB server is running
         for i in {1..3}; do
@@ -152,11 +153,8 @@ install_events FS_URLS="default" CLOUD_PROVIDER="AZURE":
 
     SMB_URLS="[]"
 
-
-    CONFIG_FILE="$(pwd)/genaiconfig.json"
-    SMB_URLS=$(cat ${CONFIG_FILE} | jq -c '.volumes[] | select(.protocol=="smb") | .url ' | jq -s | tr -d "\n\r" | tr -d '[:blank:]' )
-    echo ""
-    echo "done with SMB_URLS ${SMB_URLS}"
+    config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
+    SMB_URLS=$(echo ${config_json} | jq -c '.volumes[] | select(.access[].protocol=="smb") | .access[].url' | jq -s | tr -d "\n\r" | tr -d '[:blank:]' )
     echo ""
     if [ "${SMB_URLS}" != "[]" ]; then
         HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER\""
@@ -243,12 +241,9 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
     FS_PROTOCOL="smb"
 
     FS_PROTOCOL="smb"
-    CONFIG_FILE="$(pwd)/genaiconfig.json"
-    nfs_connection_strings=$(cat ${CONFIG_FILE} | jq -c -r '[.volumes[] | select(.protocol=="nfs") | .connectionString] | join(";")')
-    smb_connection_strings=$(cat ${CONFIG_FILE} | jq -c -r '[.volumes[] | select(.protocol=="smb") | .connectionString] | join(";")')
-
-    echo "finished with connection_strings:: ${connection_strings}"
-    echo "FS Protocol is ${FS_PROTOCOL}"
+    config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
+    nfs_connection_strings=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="nfs") | .access[].connectionString] | join(";")')
+    smb_connection_strings=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="smb") | .access[].connectionString] | join(";")')
 
     HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
     HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"$CLOUD_PROVIDER\""
@@ -273,8 +268,8 @@ install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     just create_setupconfig "${FS_URLS}" "${CLOUD_PROVIDER}"
 
-    CONFIG_FILE="$(pwd)/genaiconfig.json"
-    IS_LOCAL=$(cat ${CONFIG_FILE} | jq -r .isLocal)
+    config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
+    IS_LOCAL=$(echo ${config_json} | jq -r .isLocal)
 
     if [ "${IS_LOCAL}" == "true" ]; then
         if [[ "${CLOUD_PROVIDER}" == "AZURE" ]]; then
@@ -292,15 +287,29 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
     FS_URLS="{{ FS_URLS }}"
     LOCALDIR="{{ LOCALDIR }}"
     # Process FS_URLS to prepare volume config.
-    CONFIG_FILE="$(pwd)/genaiconfig.json"
-    if [ ! -e "${CONFIG_FILE}" ]; then
+    CONFIG_FILE="$(pwd)/config.yaml"
+    CONFIG_MAP_EXISTS=0
+    CONFIG_FILE_EXISTS=0
+
+    if kubectl get configmap genai-config 2>&1 > /dev/null; then
+        CONFIG_MAP_EXISTS=1
+    fi
+    if [ -e "${CONFIG_FILE}" ]; then
+        CONFIG_FILE_EXISTS=1
+    fi
+
+    if [ ${CONFIG_FILE_EXISTS} -eq 0 ]; then
         CONFIG_FILE_ORIG="${CONFIG_FILE}"
-        CONFIG_FILE="${CONFIG_FILE_ORIG}.tmp"
+        CONFIG_FILE="${CONFIG_FILE_ORIG}.json"
         echo "config file does not exist - creating it"
         IS_LOCAL="true"
 
         if [[ "${FS_URLS}" == "default" ]]; then
+            FS_URLS="smb-volume"
             echo "FS_URL is default -- assuming local emulated setup"
+            echo ""
+            echo " Adding one smb volume with name ${FS_URLS}"
+            echo ""
             IS_LOCAL="true"
         else
             if [[ "${FS_URLS}" == smb:* ]]; then
@@ -312,7 +321,7 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
             fi
             IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
             for fs_url in "${fs_urls_array[@]}"; do
-                echo "starting install for fs url: $fs_url"
+                echo "Adding FS URL : $fs_url"
             done
         fi
         echo -e "{\"isLocal\": ${IS_LOCAL},\n\"volumes\": [" >> ${CONFIG_FILE}
@@ -374,25 +383,33 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
             fi
             echo -e "{\n" >> ${CONFIG_FILE}
             echo -e "\"name\": \"${share_name}\",\n" >> ${CONFIG_FILE}
+            echo -e "\"access\": [{\n" >> ${CONFIG_FILE}
+            echo -e "\"protocol\": \"${FS_PROTOCOL}\",\n" >> ${CONFIG_FILE}
             echo -e "\"url\": \"${FS_URL}\",\n" >> ${CONFIG_FILE}
-            echo -e "\"connectionString\": \"${connection_string}\",\n" >> ${CONFIG_FILE}
-            echo -e "\"protocol\": \"${FS_PROTOCOL}\"\n" >> ${CONFIG_FILE}
+            echo -e "\"connectionString\": \"${connection_string}\"\n" >> ${CONFIG_FILE}
             if [ "${absolute_local_path}" != "" ]; then
                 echo -e ",\"localPath\": \"${absolute_local_path}\"\n" >> ${CONFIG_FILE}
             fi
+            echo -e "}]\n" >> ${CONFIG_FILE}
             echo -e "}\n" >> ${CONFIG_FILE}
-            echo "starting install for fs url: $FS_URL"
             IS_FIRST=0
         done
         echo -e "]\n}" >> ${CONFIG_FILE}
-        cat ${CONFIG_FILE} | jq . > ${CONFIG_FILE_ORIG}
+        cat ${CONFIG_FILE} | yq -p=json > ${CONFIG_FILE_ORIG}
         rm ${CONFIG_FILE} || true
         CONFIG_FILE=${CONFIG_FILE_ORIG}
     else
-        echo "config file does exist - skipping creating"
+        echo "config file already does exist - skipping creating"
     fi
-    kubectl create configmap genai-config --from-file=${CONFIG_FILE} || true
-
+    if [ ${CONFIG_MAP_EXISTS} -eq 0 ]; then
+        kubectl create configmap genai-config --from-file=${CONFIG_FILE}
+        if [ ${CONFIG_MAP_EXISTS} -eq 0 ]; then
+            # only deleting if we created it
+            rm ${CONFIG_FILE}
+        fi
+    else
+        echo "config map already exist - skipping creating"
+    fi
 
 uninstall:
     #!/bin/bash
@@ -400,4 +417,4 @@ uninstall:
     just uninstall_azurite
     just uninstall_local_smb_server
     just uninstall_events
-    kubectl delete configmap genai-config || true
+    kubectl delete configmap genai-config

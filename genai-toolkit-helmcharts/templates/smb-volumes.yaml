@@ -18,7 +18,7 @@ spec:
     driver: smb.csi.k8s.io
     volumeHandle: smb-volume-{{ $index }}
     volumeAttributes:
-      source: //smb-server.{{ $.Release.Namespace }}.svc.cluster.local/{{ index $new_parts 0 }}
+      source: {{ $smb_volume_connection_string }}
     nodeStageSecretRef:
       name: smbcreds
       namespace: default
