@@ -4,6 +4,9 @@ db:
 nfs:
   volumes: ""
 
+smb:
+  volumes: ""
+
 cloudStorageProvider: "ontap"
 
 apiv2:

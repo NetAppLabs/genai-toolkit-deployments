@@ -1,5 +1,5 @@
-{{- if .Values.smbVolumes }}
-{{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smbVolumes) }}
+{{- if .Values.smb.volumes }}
+{{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smb.volumes) }}
   {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
   {{- $new_parts := splitList "?" (last $volume_parts) }}
 ---

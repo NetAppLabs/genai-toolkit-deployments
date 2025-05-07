@@ -241,22 +241,22 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
 
     FS_URLS="{{ FS_URLS }}"
     FS_PROTOCOL="smb"
-    MOUNT_VOLUMES="undefined"
 
     FS_PROTOCOL="smb"
     CONFIG_FILE="$(pwd)/genaiconfig.json"
-    connection_strings=$(cat ${CONFIG_FILE} | jq -c -r '.volumes | map(.connectionString) | join(",")')
+    nfs_connection_strings=$(cat ${CONFIG_FILE} | jq -c -r '[.volumes[] | select(.protocol=="nfs") | .connectionString] | join(";")')
+    smb_connection_strings=$(cat ${CONFIG_FILE} | jq -c -r '[.volumes[] | select(.protocol=="smb") | .connectionString] | join(";")')
+
     echo "finished with connection_strings:: ${connection_strings}"
     echo "FS Protocol is ${FS_PROTOCOL}"
 
     HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
     HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"$CLOUD_PROVIDER\""
-    if [ -n "${MOUNT_VOLUMES}" ]; then
-        if [ "$FS_PROTOCOL" = "nfs" ]; then
-            HELM_SET_FLAGS="${HELM_SET_FLAGS},nfs.volumes=\"$MOUNT_VOLUMES\""
-        else
-            HELM_SET_FLAGS="${HELM_SET_FLAGS},smbVolumes=\"$connection_strings\""
-        fi
+    if [ -n "${nfs_connection_strings}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},nfs.volumes=\"$nfs_connection_strings\""
+    fi
+    if [ -n "${smb_connection_strings}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},smb.volumes=\"$smb_connection_strings\""
     fi
 
     echo "HELM_SET_FLAGS: ${HELM_SET_FLAGS}"
@@ -273,24 +273,8 @@ install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     just create_setupconfig "${FS_URLS}" "${CLOUD_PROVIDER}"
 
-    IS_LOCAL="true"
-
-    if [[ "${FS_URLS}" == "default" ]]; then
-        echo "FS_URL is default -- assuming local emulated setup"
-        IS_LOCAL="true"
-    else
-        if [[ "${FS_URLS}" == smb:* ]]; then
-            # assuming non local for smb urls
-            IS_LOCAL="false"
-        elif [[ "${FS_URLS}" == nfs:* ]]; then
-            # assuming non local for nfs urls
-            IS_LOCAL="false"
-        fi
-        IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
-        for fs_url in "${fs_urls_array[@]}"; do
-            echo "starting install for fs url: $fs_url"
-        done
-    fi
+    CONFIG_FILE="$(pwd)/genaiconfig.json"
+    IS_LOCAL=$(cat ${CONFIG_FILE} | jq -r .isLocal)
 
     if [ "${IS_LOCAL}" == "true" ]; then
         if [[ "${CLOUD_PROVIDER}" == "AZURE" ]]; then
@@ -313,12 +297,24 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
         CONFIG_FILE_ORIG="${CONFIG_FILE}"
         CONFIG_FILE="${CONFIG_FILE_ORIG}.tmp"
         echo "config file does not exist - creating it"
-        IS_LOCAL="false"
+        IS_LOCAL="true"
+
         if [[ "${FS_URLS}" == "default" ]]; then
             echo "FS_URL is default -- assuming local emulated setup"
             IS_LOCAL="true"
-            FS_URLS="local://smb-volume1"
-        fi 
+        else
+            if [[ "${FS_URLS}" == smb:* ]]; then
+                # assuming non local for smb urls
+                IS_LOCAL="false"
+            elif [[ "${FS_URLS}" == nfs:* ]]; then
+                # assuming non local for nfs urls
+                IS_LOCAL="false"
+            fi
+            IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
+            for fs_url in "${fs_urls_array[@]}"; do
+                echo "starting install for fs url: $fs_url"
+            done
+        fi
         echo -e "{\"isLocal\": ${IS_LOCAL},\n\"volumes\": [" >> ${CONFIG_FILE}
         IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
         IS_FIRST=1
@@ -394,22 +390,6 @@ create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
     kubectl create configmap genai-config --from-file=${CONFIG_FILE} || true
 
 
-install_nfs_local MOUNT_VOLUMES="":
-    #!/bin/bash
-    MOUNT_VOLUMES="{{ MOUNT_VOLUMES }}"
-
-    if [ -z "${MOUNT_VOLUMES}" ]; then
-      echo "Error: MOUNT_VOLUMES is not set. Please set MOUNT_VOLUMES to a valid path."
-      exit 1
-    fi
-
-    HELM_SET_FLAGS="apiv2.cloudEnv=local"
-    HELM_SET_FLAGS="${HELM_SET_FLAGS},localVolumePaths=${MOUNT_VOLUMES}"
-
-    echo "Using HELM_SET_FLAGS: ${HELM_SET_FLAGS}"
-
-    helm upgrade --install genai-toolkit genai-toolkit-helmcharts --set "${HELM_SET_FLAGS}"
-
 uninstall:
     #!/bin/bash
     just uninstall_genai
@@ -417,8 +397,3 @@ uninstall:
     just uninstall_local_smb_server
     just uninstall_events
     kubectl delete configmap genai-config || true
-
-uninstall_nfs_local:
-    #!/bin/bash
-    helm uninstall genai-toolkit || true
-

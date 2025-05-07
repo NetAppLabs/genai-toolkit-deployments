@@ -82,10 +82,10 @@ spec:
               value: "{{ .Values.apiv2.apiKeyLifetimeDays }}"
             - name: TOOLKIT_VERSION
               value: {{ .Chart.Version | quote }}
-            {{- if .Values.smbVolumes }}
+            {{- if .Values.smb.volumes }}
             - name: APIV2_VOLUME_MAPPING
               value: {{ $allConcatStrings := "" -}}
-                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smbVolumes) }}
+                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
                   {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
                   {{- $new_parts := splitList "?" (last $volume_parts) }}
                   {{- $concatString :=  printf "%s;/%s/%s" $smb_volume_connection_string $.Values.cloudStorageProvider (index $new_parts 0) }}
@@ -116,8 +116,8 @@ spec:
               mountPath: {{ $concatString }}
               {{- end }}
             {{- else }}
-              {{- if .Values.smbVolumes }}
-                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smbVolumes) }}
+              {{- if .Values.smb.volumes }}
+                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
                   {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
                   {{- $new_parts := splitList "?" (last $volume_parts) }}
                   {{- $volume_mount_point := printf "%s/%s/%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $new_parts 0) }}
@@ -143,8 +143,8 @@ spec:
             claimName: netapp-nfs-pvc-{{ $index }}
           {{- end }}
         {{- else }}
-          {{- if .Values.smbVolumes }}
-            {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smbVolumes) }}
+          {{- if .Values.smb.volumes }}
+            {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
         - name: volume-{{ $index }}
           persistentVolumeClaim:
             claimName: netapp-smb-volume-pvc-{{ $index }}
