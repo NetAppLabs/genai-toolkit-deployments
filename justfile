@@ -6,92 +6,123 @@ default:
 LOCALDIR := `sh -c 'pwd'`
 RUNTIME := `sh -c "if [ \"\$(kubectl get nodes --no-headers | awk '{print \$1}')\" = 'orbstack' ]; then echo orbstack; else echo docker-desktop; fi"`
 
-# Optional parameters: smb_user, smb_pass, smb_port
-install_local_smb_server local_volume_path="./smb-volume" smb_user="smbuser" smb_pass="mypass" smb_port="30445":
+check_requirements:
     #!/bin/bash
-
-    local_volume_path="{{ local_volume_path }}"
-    mkdir -p ${local_volume_path}
-    volume_paths=($local_volume_path)
-    # Check if the SMB server is already running
-    if kubectl get pods --no-headers | grep smb-server | awk '{print $3}' | grep -q "Running"; then
-        echo "SMB server is already running. Exiting..."
-        exit 0
+    if ! command -v kubectl 2>&1 ; then
+        echo "please install kubectl"
+        exit 1
+    fi
+    if ! command -v helm 2>&1 ; then
+        echo "please install helm"
+        exit 1
+    fi
+    if ! command -v jq 2>&1 ; then
+        echo "please install jq"
+        exit 1
+    fi
+    if ! command -v envsubst 2>&1 ; then
+        echo "please install gettext/envsubst"
+        exit 1
     fi
 
-    # Split the paths into an array
-    #IFS=';' read -r -A volume_path_array <<< "${volume_paths}"
-    volume_path_array=${volume_paths}
-    SMB_SHARES=""
-    VOLUME_MOUNTS=""
-    VOLUMES=""
 
-    for volume_path in "${volume_path_array[@]}"; do
-        # Determine if path is absolute or relative
-        if [[ "$volume_path" = /* ]]; then
-            SMB_PATH="$volume_path"
-        else
-            SMB_PATH="{{ LOCALDIR }}/$volume_path"
+# Optional parameters: smb_user, smb_pass, smb_port
+install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pass="mypass" smb_port="30445":
+    #!/bin/bash
+    smb_user="{{ smb_user }}"
+    smb_pass="{{ smb_pass }}"
+    smb_port="{{ smb_port }}"
+    CONFIG_FILE="$(pwd)/genaiconfig.json"
+    local_volume_paths=$(cat ${CONFIG_FILE} | jq -c -r '[.volumes[] | select(.protocol=="smb") | .localPath] | join(",")')
+
+    echo "Done with local_volume_paths: ${local_volume_paths}"
+    if [ "${local_volume_paths}" != "" ]; then
+
+        # Split the paths into an array
+        IFS=',' read -r -a volume_path_array <<< "${local_volume_paths}"
+
+        # Check if the SMB server is already running
+        if kubectl get pods --no-headers | grep smb-server | awk '{print $3}' | grep -q "Running"; then
+            echo "SMB server is already running. Exiting..."
+            exit 0
         fi
 
-        SMB_SHARE_NAME=$(basename "$SMB_PATH")
+        SMB_SHARES=""
+        VOLUME_MOUNTS=""
+        VOLUMES=""
 
-        SMB_SHARES="${SMB_SHARES}
+        for volume_path in "${volume_path_array[@]}"; do
+
+            # Determine if path is absolute or relative
+            if [[ "$volume_path" = /* ]]; then
+                SMB_PATH="$volume_path"
+            else
+                SMB_PATH="{{ LOCALDIR }}/$volume_path"
+            fi
+
+            SMB_SHARE_NAME=$(basename "$SMB_PATH")
+
+            SMB_SHARES="${SMB_SHARES}
               - \"-s\"
               - ${SMB_SHARE_NAME};/${SMB_SHARE_NAME};yes;no;no;all;none"
 
-        VOLUME_MOUNTS="${VOLUME_MOUNTS}
+            VOLUME_MOUNTS="${VOLUME_MOUNTS}
               - mountPath: /${SMB_SHARE_NAME}
                 name: ${SMB_SHARE_NAME}"
 
-        VOLUMES="${VOLUMES}
+            VOLUMES="${VOLUMES}
             - name: ${SMB_SHARE_NAME}
               hostPath:
                 path: ${SMB_PATH}
                 type: DirectoryOrCreate"
-    done
+        done
 
-    # Trim leading newlines (but keep indentation intact)
-    SMB_SHARES=$(echo "$SMB_SHARES" | sed '1d')
-    VOLUME_MOUNTS=$(echo "$VOLUME_MOUNTS" | sed '1d')
-    VOLUMES=$(echo "$VOLUMES" | sed '1d')
+        # Trim leading newlines (but keep indentation intact)
+        SMB_SHARES=$(echo "$SMB_SHARES" | sed '1d')
+        VOLUME_MOUNTS=$(echo "$VOLUME_MOUNTS" | sed '1d')
+        VOLUMES=$(echo "$VOLUMES" | sed '1d')
 
-    echo "Deploying Samba to Kubernetes with paths: ${volume_paths}"
-    echo "SMB credentials: user={{ smb_user }}, pass={{ smb_pass }}"
-    echo "NodePort: {{ smb_port }}"
+        echo "Deploying Samba to Kubernetes with paths: ${volume_paths}"
+        echo "SMB credentials: user=${smb_user}, pass=${smb_pass}"
+        echo "NodePort: ${smb_port}"
 
-    # Create or update the secret named 'smbcreds'
-    kubectl delete secret smbcreds --ignore-not-found=true
-    kubectl create secret generic smbcreds \
-    --from-literal username="{{ smb_user }}" \
-    --from-literal password="{{ smb_pass }}"
+        # Create or update the secret named 'smbcreds'
+        kubectl delete secret smbcreds --ignore-not-found=true
+        kubectl create secret generic smbcreds \
+            --from-literal username="{{ smb_user }}" \
+            --from-literal password="{{ smb_pass }}"
 
-    # Export environment variables for envsubst
-    export SMB_SHARES
-    export VOLUME_MOUNTS
-    export VOLUMES
-    export SMB_445_NODE_PORT="{{ smb_port }}"
+        # Export environment variables for envsubst
+        export SMB_SHARES
+        export VOLUME_MOUNTS
+        export VOLUMES
+        export SMB_445_NODE_PORT="${smb_port}"
 
-    # Apply the YAML that uses $SMB_SHARES, $VOLUME_MOUNTS, and $VOLUMES
-    envsubst '$SMB_SHARES $VOLUME_MOUNTS $VOLUMES $SMB_445_NODE_PORT' < smb-server/smb-server-deployment.yaml | kubectl apply -f -
+        # Apply the YAML that uses $SMB_SHARES, $VOLUME_MOUNTS, and $VOLUMES
+        envsubst '$SMB_SHARES $VOLUME_MOUNTS $VOLUMES $SMB_445_NODE_PORT' < smb-server/smb-server-deployment.yaml | kubectl apply -f -
+        #envsubst '$SMB_SHARES $VOLUME_MOUNTS $VOLUMES $SMB_445_NODE_PORT' < smb-server/smb-server-deployment.yaml > /tmp/smbserver.yaml
+        #cat /tmp/smbserver.yaml | kubectl apply -f -
 
-    # Check if the SMB server is running
-    for i in {1..3}; do
-        if kubectl get deployment smb-server &> /dev/null; then
-            echo "SMB server is running."
-            break
-        else
-            echo "Waiting for SMB server to start... ($i/3)"
-            sleep 3
+        # Check if the SMB server is running
+        for i in {1..3}; do
+            if kubectl get deployment smb-server &> /dev/null; then
+                echo "SMB server is running."
+                break
+            else
+                echo "Waiting for SMB server to start... ($i/3)"
+                sleep 3
+            fi
+        done
+
+        if ! kubectl get deployment smb-server &> /dev/null; then
+            echo "SMB server failed to start after 3 attempts. Exiting..."
+            exit 1
         fi
-    done
 
-    if ! kubectl get deployment smb-server &> /dev/null; then
-        echo "SMB server failed to start after 3 attempts. Exiting..."
-        exit 1
+        echo "SMB server is up and running."
+    else
+        echo "No local volumes found - skipping local smb server"
     fi
-
-    echo "SMB server is up and running."
 
 
 uninstall_local_smb_server:
@@ -113,33 +144,59 @@ uninstall_azurite:
     kubectl delete -f azurite-k8s.yaml --ignore-not-found || true
 
 
-install_events FS_URL="default" CLOUD_PROVIDER="AZURE" LISTENER_MODE="default":
+install_events FS_URLS="default" CLOUD_PROVIDER="AZURE":
     #!/bin/bash
-    FS_URL="{{ FS_URL }}"
 
-    LISTENER_MODE="{{ LISTENER_MODE }}"
-    if [[ "${LISTENER_MODE}" == "SMB" ]]; then
-        SMB_URL="{{FS_URL}}"
-        echo "Received SMB_URL: $SMB_URL"
-        LISTENER_COMPONENT="function-smblistener-js"
-    elif [[ "${LISTENER_MODE}" == "FPOLICY" ]]; then
-        FSEVENTS_SERVER_MODE="fpolicy"
-        LISTENER_COMPONENT="fs-events-server"
-    elif [[ "${LISTENER_MODE}" == "LOCAL" ]]; then
-        FSEVENTS_SERVER_MODE="local"
-        FSEVENTS_LOCAL_DIR="{{FS_URL}}"
-        LISTENER_COMPONENT="fs-events-server"
+    CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
+    FS_URLS="{{ FS_URLS }}"
+
+    SMB_URLS="[]"
+
+
+    CONFIG_FILE="$(pwd)/genaiconfig.json"
+    SMB_URLS=$(cat ${CONFIG_FILE} | jq -c '.volumes[] | select(.protocol=="smb") | .url ' | jq -s | tr -d "\n\r" | tr -d '[:blank:]' )
+    echo ""
+    echo "done with SMB_URLS ${SMB_URLS}"
+    echo ""
+    if [ "${SMB_URLS}" != "[]" ]; then
+        HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER\""
+        if [ -n "${SMB_URLS}" ]; then
+            HELM_SET_FLAGS="${HELM_SET_FLAGS},smb.urls=${SMB_URLS}"
+        fi
+        if [ -n "${SMB_LISTENER_RETRIES}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},smb.listenerRetries=\"${SMB_LISTENER_RETRIES}\""
+        fi
+        if [ -n "${AzureWebJobsStorage}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},azure.aqsConnectionString=\"${AzureWebJobsStorage}\""
+        fi
+        if [ -n "${AWS_REGION}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},aws.region=\"${AWS_REGION}\""
+        fi
+        if [ -n "${SQS_QUEUE_URL}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},aws.sqsQueueUrl=\"${SQS_QUEUE_URL}\""
+        fi
+        if [ -n "${SQS_MESSAGE_GROUP_ID}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},aws.sqsMessageGroupId=\"${SQS_MESSAGE_GROUP_ID}\""
+        fi
+        if [ -n "${NATS_URL}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},nats.url=\"${NATS_URL}\""
+        fi
+        if [ -n "${NATS_SUBJECT}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},nats.subject=\"${NATS_SUBJECT}\""
+        fi
+
+        echo "Starting up SMB Listener with SMB_URLS: ${SMB_URLS}"
+        helm upgrade --install smb-listener smb-listener --set-json ${HELM_SET_FLAGS}
+    else
+        echo "no SMB volumes founds, skipping smb-listener"
     fi
-
-    components+=("${LISTENER_COMPONENT}" "function-event-distributor" "function-imageresize" "function-preprocess")
-
-    # TODO: Install events
-
+    
 uninstall_events:
     #!/bin/bash
+    helm uninstall smb-listener || true
     echo "todo uninstall events"
 
-install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VOLUMES="./smb-volume":
+install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
     #!/bin/bash
 
     # Add helm repositories if missing.
@@ -163,10 +220,9 @@ install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VO
     fi
 
     # Retrieve parameter values (these may be provided by Just’s templating).
-    FS_URL="{{ FS_URL }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     apiv2_secret_store="kubernetes"
-    volumes="{{ MOUNT_VOLUMES }}"
+    volumes=""
 
     IFS=';' read -r -a share_names <<< "$volumes"
 
@@ -183,35 +239,14 @@ install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VO
         smb_port="445"
     fi
 
-    FS_PROTOCOL="{{ FS_PROTOCOL }}"
-    MOUNT_VOLUMES="{{ MOUNT_VOLUMES }}"
+    FS_URLS="{{ FS_URLS }}"
+    FS_PROTOCOL="smb"
+    MOUNT_VOLUMES="undefined"
 
-    # Process FS_URL to prepare volume mount strings.
-    if [[ $FS_URL == smb:* ]]; then
-        FS_PROTOCOL="smb"
-        connection_strings="{{ FS_URL }}"
-    elif [[ $FS_URL == default ]]; then
-        FS_PROTOCOL="smb"
-        connection_strings=""
-        smb_user="smbuser"
-        smb_pass="mypass"
-
-        for share_name in "${share_names[@]}"; do
-            # Build connection string using shell variables.
-            connection_string="smb://${smb_user}:${smb_pass}@${node_ip}:${smb_port}/$(basename "$share_name")?sec=ntlmssp"
-            if [ -z "$connection_strings" ]; then
-                connection_strings="$connection_string"
-            else
-                connection_strings="$connection_strings;$connection_string"
-            fi
-        done
-    elif [[ $FS_URL == nfs:* ]]; then
-        FS_PROTOCOL="nfs"
-        # translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
-        converted_mount_volumes=$(echo "$MOUNT_VOLUMES" | sed -e 's|nfs://||' -e 's|/|:|')
-        MOUNT_VOLUMES="$converted_mount_volumes"
-    fi
-
+    FS_PROTOCOL="smb"
+    CONFIG_FILE="$(pwd)/genaiconfig.json"
+    connection_strings=$(cat ${CONFIG_FILE} | jq -c -r '.volumes | map(.connectionString) | join(",")')
+    echo "finished with connection_strings:: ${connection_strings}"
     echo "FS Protocol is ${FS_PROTOCOL}"
 
     HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
@@ -232,23 +267,132 @@ install_genai FS_URL="default" CLOUD_PROVIDER="AZURE" FS_PROTOCOL="smb" MOUNT_VO
 uninstall_genai:
     helm uninstall genai-toolkit || true
 
-install FS_URL="default" CLOUD_PROVIDER="AZURE" MOUNT_VOLUMES="" LISTENER_MODE="default":
+install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
-    FS_URL="{{ FS_URL }}"
+    FS_URLS="{{ FS_URLS }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
-    MOUNT_VOLUMES="{{ MOUNT_VOLUMES }}"
-    LISTENER_MODE="{{ LISTENER_MODE }}"
+    just create_setupconfig "${FS_URLS}" "${CLOUD_PROVIDER}"
 
-    if [[ "${FS_URL}" == "default" ]]; then
+    IS_LOCAL="true"
+
+    if [[ "${FS_URLS}" == "default" ]]; then
         echo "FS_URL is default -- assuming local emulated setup"
+        IS_LOCAL="true"
+    else
+        if [[ "${FS_URLS}" == smb:* ]]; then
+            # assuming non local for smb urls
+            IS_LOCAL="false"
+        elif [[ "${FS_URLS}" == nfs:* ]]; then
+            # assuming non local for nfs urls
+            IS_LOCAL="false"
+        fi
+        IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
+        for fs_url in "${fs_urls_array[@]}"; do
+            echo "starting install for fs url: $fs_url"
+        done
+    fi
+
+    if [ "${IS_LOCAL}" == "true" ]; then
         if [[ "${CLOUD_PROVIDER}" == "AZURE" ]]; then
             just install_azurite
         fi
         just install_local_smb_server
     fi
 
-    just install_genai "${FS_URL}" "${CLOUD_PROVIDER}" "${MOUNT_VOLUMES}"
-    just install_events "${FS_URL}" "${CLOUD_PROVIDER}" "${LISTENER_MODE}"
+    just install_genai "${FS_URLS}" "${CLOUD_PROVIDER}"
+    just install_events "${FS_URLS}" "${CLOUD_PROVIDER}"
+
+
+create_setupconfig FS_URLS="default" CLOUD_PROVIDER="AZURE":
+    #!/bin/bash
+    FS_URLS="{{ FS_URLS }}"
+    LOCALDIR="{{ LOCALDIR }}"
+    # Process FS_URLS to prepare volume config.
+    CONFIG_FILE="$(pwd)/genaiconfig.json"
+    if [ ! -e "${CONFIG_FILE}" ]; then
+        CONFIG_FILE_ORIG="${CONFIG_FILE}"
+        CONFIG_FILE="${CONFIG_FILE_ORIG}.tmp"
+        echo "config file does not exist - creating it"
+        IS_LOCAL="false"
+        if [[ "${FS_URLS}" == "default" ]]; then
+            echo "FS_URL is default -- assuming local emulated setup"
+            IS_LOCAL="true"
+            FS_URLS="local://smb-volume1"
+        fi 
+        echo -e "{\"isLocal\": ${IS_LOCAL},\n\"volumes\": [" >> ${CONFIG_FILE}
+        IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
+        IS_FIRST=1
+        for FS_URL in "${fs_urls_array[@]}"; do
+            absolute_local_path=""
+            if [[ $FS_URL == nfs:* ]]; then
+                echo "found nfs url, skipping prep"
+            elif [[ $FS_URL == smb:* ]]; then
+                echo "found smb url, skipping prep"
+            else
+                if [[ $FS_URL == local:* ]]; then
+                    local_path=$(echo "${FS_URL}" | sed -e 's|local://||' -e 's|/|:|')
+                else
+                    local_path="${FS_URL}"
+                fi
+                # Determine if path is absolute or relative
+                if [[ "$local_path" = /* ]]; then
+                    absolute_local_path="$local_path"
+                else
+                    absolute_local_path="${LOCALDIR}/$local_path"
+                fi
+                if [ ! -e "${absolute_local_path}" ]; then
+                    echo "Path: ${absolute_local_path} not found, creating"
+                    mkdir -p ${absolute_local_path}
+                fi
+
+                share_name=$(basename "$absolute_local_path")
+                smb_user="smbuser"
+                smb_pass="mypass"
+                smb_port="445"
+                smb_server="smb-server.default.svc.cluster.local"
+                FS_URL="smb://${smb_user}:${smb_pass}@${smb_server}:${smb_port}/${share_name}?sec=ntlmssp"
+            fi
+
+
+            proto="$(echo $FS_URL | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+            url=$(echo $FS_URL | sed -e s,$proto,,g)
+            userpass="$(echo $url | grep @ | cut -d@ -f1)"
+            hostport=$(echo $url | sed -e s,$userpass@,,g | cut -d/ -f1)
+            host="$(echo $hostport | sed -e 's,:.*,,g')"
+            port="$(echo $hostport | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
+            share_name="$(echo $url | grep / | cut -d/ -f2- | awk -F '?' '{print $1}')"
+            FS_PROTOCOL="$(echo $proto | awk -F ':' '{print $1}')"
+
+            if [[ $FS_URL == smb:* ]]; then
+                connection_string="//${host}/${share_name}"
+            elif [[ $FS_URL == nfs:* ]]; then
+                # translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
+                connection_string=$(echo "$FS_URL" | sed -e 's|nfs://||' -e 's|/|:|')
+            fi
+            if [ $IS_FIRST -eq 0 ]; then
+                echo -e ",\n" >> ${CONFIG_FILE}
+            fi
+            echo -e "{\n" >> ${CONFIG_FILE}
+            echo -e "\"name\": \"${share_name}\",\n" >> ${CONFIG_FILE}
+            echo -e "\"url\": \"${FS_URL}\",\n" >> ${CONFIG_FILE}
+            echo -e "\"connectionString\": \"${connection_string}\",\n" >> ${CONFIG_FILE}
+            echo -e "\"protocol\": \"${FS_PROTOCOL}\"\n" >> ${CONFIG_FILE}
+            if [ "${absolute_local_path}" != "" ]; then
+                echo -e ",\"localPath\": \"${absolute_local_path}\"\n" >> ${CONFIG_FILE}
+            fi
+            echo -e "}\n" >> ${CONFIG_FILE}
+            echo "starting install for fs url: $FS_URL"
+            IS_FIRST=0
+        done
+        echo -e "]\n}" >> ${CONFIG_FILE}
+        cat ${CONFIG_FILE} | jq . > ${CONFIG_FILE_ORIG}
+        rm ${CONFIG_FILE} || true
+        CONFIG_FILE=${CONFIG_FILE_ORIG}
+    else
+        echo "config file does exist - skipping creating"
+    fi
+    kubectl create configmap genai-config --from-file=${CONFIG_FILE} || true
+
 
 install_nfs_local MOUNT_VOLUMES="":
     #!/bin/bash
@@ -272,6 +416,7 @@ uninstall:
     just uninstall_azurite
     just uninstall_local_smb_server
     just uninstall_events
+    kubectl delete configmap genai-config || true
 
 uninstall_nfs_local:
     #!/bin/bash
