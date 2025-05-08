@@ -85,7 +85,7 @@ just install smb://smbuser:smbpass@smbserver/share?sec=ntlmssp AZURE
 For ANF, the toolkit requires an AKS cluster, at least one ANF volume, and connectivity between the volumes and the cluster.
 
 #### Setting up an ANF Volume
-To get started, follow this guide: [Create an NFS volume for Azure NetApp Files](https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-volumes). Note the vNet where you create the volume. Once the volume is available, proceed to the next step.
+To get started, follow the guides for [Create an SMB volume for Azure NetApp Files](https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-volumes-smb) or  [Create an NFS volume for Azure NetApp Files](https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-volumes). Note the vNet where you create the volume. Once the volume is available, proceed to the next step.
 
 #### Setting up an AKS Cluster
 Follow this guide: [Quickstart: Deploy an Azure Kubernetes Service (AKS) cluster using Azure portal](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-portal?tabs=azure-cli). Note the vNet where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
