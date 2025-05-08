@@ -20,18 +20,19 @@ nats:
   subject: ""
 
 # This sets the smb-listener container image
+dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
 image:
-  repository: us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/smb-listener
+  name: smb-listener
   pullPolicy: IfNotPresent
 
 # Define the resources you'd like to request for smb-listener
 resources:
   limits:
-    cpu: 100m
-    memory: 256Mi
+    cpu: '0'
+    memory: '0'
   requests:
-    cpu: 100m
-    memory: 256Mi
+    cpu: '0'
+    memory: '0'
 
 replicaCount: 1
 

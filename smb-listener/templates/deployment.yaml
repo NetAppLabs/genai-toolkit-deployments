@@ -39,7 +39,7 @@ spec:
         - name: {{ $.Chart.Name }}-{{ $index }}
           securityContext:
             {{- toYaml $.Values.securityContext | nindent 12 }}
-          image: "{{ $.Values.image.repository }}:{{ $.Chart.Version }}"
+          image: "{{ $.Values.dockerRegistry }}{{ $.Values.image.name }}:{{ $.Chart.Version }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           env:
             - name: SMB_URL

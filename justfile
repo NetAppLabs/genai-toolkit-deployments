@@ -36,7 +36,7 @@ check_requirements:
 
 
 # Optional parameters: smb_user, smb_pass, smb_port
-install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pass="mypass" smb_port="30445":
+install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pass="mypass" smb_port="30445": check_requirements
     #!/bin/bash
     set -e
     smb_user="{{ smb_user }}"
@@ -141,7 +141,7 @@ uninstall_local_smb_server:
     kubectl delete secret smbcreds --ignore-not-found=true
 
 
-install_azurite:
+install_azurite: check_requirements
     #!/bin/bash
     cd azurite
     kubectl apply -f azurite-k8s.yaml || true
@@ -152,7 +152,7 @@ uninstall_azurite:
     kubectl delete -f azurite-k8s.yaml --ignore-not-found || true
 
 
-install_events FS_URLS="default" CLOUD_PROVIDER="AZURE":
+install_events FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
     set -e
 
@@ -205,7 +205,7 @@ uninstall_events:
     helm uninstall smb-listener || true
     echo "todo uninstall events"
 
-install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE":
+install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
     set -e
 
@@ -291,8 +291,9 @@ install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     just install_events "${FS_URLS}" "${CLOUD_PROVIDER}"
 
 
-configure FS_URLS="default" CLOUD_PROVIDER="AZURE":
+configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
+    set -e
     # Setting up configmap with config
     # auto populating if not present
     FS_URLS="{{ FS_URLS }}"
@@ -363,19 +364,24 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE":
 
                 share_name_upper=$(basename "$absolute_local_path")
                 share_name=$(echo ${share_name_upper} | tr '[:upper:]' '[:lower:]')
+                #TODO move these settings to global config
                 smb_user="smbuser"
                 smb_pass="mypass"
-                smb_port=""
+                default_smb_port="445"
+                smb_server="smb-server.default.svc.cluster.local"
+                smb_port="${default_smb_port}"
                 smb_port_if_any_with_colon=""
                 #if [ "${RUNTIME}" = "orbstack" ]; then
                 #    smb_port="$(kubectl get svc smb-server -o jsonpath='{.spec.ports[?(@.name=="smb-server")].nodePort}')"
                 #else
                 #    smb_port="445"
                 #fi
-                if [ -n "${smb_port} "]; then
-                    smb_port_if_any_with_colon=":${smb_port}"
+                if [ -n "${smb_port}" ]; then
+                    if [ "${smb_port}" != "${default_smb_port}" ]; then
+                        # skipping adding port if it is default
+                        smb_port_if_any_with_colon=":${smb_port}"
+                    fi
                 fi
-                smb_server="smb-server.default.svc.cluster.local"
                 FS_URL="smb://${smb_user}:${smb_pass}@${smb_server}${smb_port_if_any_with_colon}/${share_name}?sec=ntlmssp"
             fi
 
@@ -389,12 +395,8 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE":
             share_name="$(echo $url | grep / | cut -d/ -f2- | awk -F '?' '{print $1}')"
             FS_PROTOCOL="$(echo $proto | awk -F ':' '{print $1}')"
 
-            port_with_colon_if_any=""
-            if [ -n "${port}" ]; then
-                port_with_colon_if_any=":${port}"
-            fi
             if [[ $FS_URL == smb:* ]]; then
-                connection_string="//${host}${port_with_colon_if_any}/${share_name}"
+                connection_string="//${host}/${share_name}"
             elif [[ $FS_URL == nfs:* ]]; then
                 # translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
                 connection_string=$(echo "$FS_URL" | sed -e 's|nfs://||' -e 's|/|:/|')
