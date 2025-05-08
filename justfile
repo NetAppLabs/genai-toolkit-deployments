@@ -151,8 +151,35 @@ uninstall_azurite:
     cd azurite
     kubectl delete -f azurite-k8s.yaml --ignore-not-found || true
 
-
 install_events FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
+    #!/bin/bash
+
+    CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
+    FS_URLS="{{ FS_URLS }}"
+
+    just install_smb_listener "${FS_URLS}" "${CLOUD_PROVIDER}"
+    just install_event_distributor "${FS_URLS}" "${CLOUD_PROVIDER}"
+
+
+install_event_distributor FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
+    #!/bin/bash
+    set -e
+
+    CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
+    FS_URLS="{{ FS_URLS }}"
+
+    #HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER\""
+
+    echo ""
+    echo "===== Installing helm chart for event-distributor ====="
+    #helm upgrade --install event-distributor event-distributor --set-json ${HELM_SET_FLAGS}
+    helm upgrade --install event-distributor event-distributor
+    echo "=================================================="
+    echo ""
+
+
+
+install_smb_listener FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
     set -e
 
@@ -203,7 +230,8 @@ install_events FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
 uninstall_events:
     #!/bin/bash
     helm uninstall smb-listener || true
-    echo "todo uninstall events"
+    helm uninstall event-distributor || true
+    echo "done uninstalling events"
 
 install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
@@ -252,6 +280,22 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     nfs_connection_strings=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="nfs") | .access[].connectionString] | join(";")')
     smb_connection_strings=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="smb") | .access[].connectionString] | join(";")')
 
+    volume_urls=$(echo ${config_json} | jq -c -r '[.volumes[] | .access[].url] | join(";")')
+    volume_names=$(echo ${config_json} | jq -c -r '[.volumes[] | .name] | join(";")')
+    IFS=';' read -r -a volume_urls_array <<< "$volume_urls"
+    IFS=';' read -r -a volume_names_array <<< "$volume_names"
+
+    # Calculate the volume mappings
+    i=0
+    volumeMapping=""
+    for fs_url in "${volume_urls[@]}"; do
+        vol_name=${volume_names[$i]}
+        vol_path="/ontap/${vol_name}"
+        volumeMapping="${volumeMapping}${fs_url};${vol_path}__"
+        i=$((i+1))
+    done
+
+
     HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
     #HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"$CLOUD_PROVIDER\""
     if [ -n "${nfs_connection_strings}" ]; then
@@ -259,6 +303,9 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     fi
     if [ -n "${smb_connection_strings}" ]; then
         HELM_SET_FLAGS="${HELM_SET_FLAGS},smb.volumes=\"$smb_connection_strings\""
+    fi
+    if [ -n "${volumeMapping}" ]; then
+        HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.volumeMapping=\"$volumeMapping\""
     fi
 
     # Perform the helm upgrade/install (ensure the chart reference is correct).
@@ -440,4 +487,6 @@ uninstall:
     just uninstall_azurite
     just uninstall_local_smb_server
     just uninstall_events
+    kubectl delete secret genai-toolkit-api-key || true
+    kubectl delete secret genai-toolkit-realm-secret || true
     kubectl delete configmap genai-config

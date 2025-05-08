@@ -82,7 +82,10 @@ spec:
               value: "{{ .Values.apiv2.apiKeyLifetimeDays }}"
             - name: TOOLKIT_VERSION
               value: {{ .Chart.Version | quote }}
-            {{- if .Values.smb.volumes }}
+            {{- if .Values.apiv2.volumeMapping }}
+            - name: APIV2_VOLUME_MAPPING
+              value: {{ .Values.apiv2.volumeMapping }}
+            {{- else if .Values.smb.volumes }}
             - name: APIV2_VOLUME_MAPPING
               value: {{ $allConcatStrings := "" -}}
                 {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
@@ -92,9 +95,6 @@ spec:
                   {{- $allConcatStrings = printf "%s%s__" $allConcatStrings $concatString -}}
                 {{- end -}}
                 {{- $allConcatStrings | trimSuffix "__" }}
-            {{- else if .Values.apiv2.volumeMapping }}
-            - name: APIV2_VOLUME_MAPPING
-              value: {{ .Values.apiv2.volumeMapping }}
             {{- end }}
           livenessProbe:
             httpGet:
