@@ -96,11 +96,11 @@ install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pas
         echo "SMB credentials: user=${smb_user}, pass=${smb_pass}"
         echo "NodePort: ${smb_port}"
 
-        # Create or update the secret named 'smbcreds'
-        kubectl delete secret smbcreds --ignore-not-found=true
-        kubectl create secret generic smbcreds \
-            --from-literal username="{{ smb_user }}" \
-            --from-literal password="{{ smb_pass }}"
+        # # Create or update the secret named 'smbcreds'
+        # kubectl delete secret smbcreds --ignore-not-found=true
+        # kubectl create secret generic smbcreds \
+        #     --from-literal username="{{ smb_user }}" \
+        #     --from-literal password="{{ smb_pass }}"
 
         # Export environment variables for envsubst
         export SMB_SHARES
@@ -331,10 +331,11 @@ install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     IS_LOCAL=$(echo ${config_json} | jq -r .isLocal)
 
     if [ "${IS_LOCAL}" == "true" ]; then
-        if [[ "${CLOUD_PROVIDER}" == "AZURE" ]]; then
-            just install_azurite
-        fi
         just install_local_smb_server
+    fi
+    # For now always installing azurite
+    if [[ "${CLOUD_PROVIDER}" == "AZURE" ]]; then
+        just install_azurite
     fi
 
     just install_genai "${FS_URLS}" "${CLOUD_PROVIDER}"
@@ -439,6 +440,8 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
             proto="$(echo $FS_URL | grep :// | sed -e's,^\(.*://\).*,\1,g')"
             url=$(echo $FS_URL | sed -e s,$proto,,g)
             userpass="$(echo $url | grep @ | cut -d@ -f1)"
+            username="$(echo $userpass | awk -F ':' '{print $1}')"
+            password="$(echo $userpass | awk -F ':' '{print $2}')"
             hostport=$(echo $url | sed -e s,$userpass@,,g | cut -d/ -f1)
             host="$(echo $hostport | sed -e 's,:.*,,g')"
             port="$(echo $hostport | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
@@ -447,6 +450,16 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
 
             if [[ $FS_URL == smb:* ]]; then
                 connection_string="//${host}/${share_name}"
+
+                if [ -n "${username}" ] && [ -n "${password}" ]; then
+                    # echo "creating smbcreds with username: ${username} and password ${password}"
+                    # Create or update the secret named 'smbcreds' for smb volumes
+                    kubectl delete secret smbcreds --ignore-not-found=true
+                    kubectl create secret generic smbcreds \
+                        --from-literal username="${username}" \
+                        --from-literal password="${password}"
+                fi
+
             elif [[ $FS_URL == nfs:* ]]; then
                 # translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
                 connection_string=$(echo "$FS_URL" | sed -e 's|nfs://||' -e 's|/|:/|')

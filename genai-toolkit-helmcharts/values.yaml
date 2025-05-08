@@ -47,7 +47,7 @@ keycloakx:
       value: keycloak
     - name: JAVA_OPTS_APPEND
       value: >-
-        -Djgroups.dns.query={{ include "keycloak.fullname" . }}-headless -Dkeycloak.migration.action=import -Dkeycloak.migration.provider=singleFile -Dkeycloak.migration.file=/genai-toolkit-realm/genai-toolkit-realm.json -Dkeycloak.migration.replace-placeholders=true -Dkeycloak.profile.feature.upload_scripts=enabled -Dkeycloak.migration.strategy=IGNORE_EXISTING -XX:UseSVE=0
+        -Djgroups.dns.query={{ include "keycloak.fullname" . }}-headless -Dkeycloak.migration.action=import -Dkeycloak.migration.provider=singleFile -Dkeycloak.migration.file=/genai-toolkit-realm/genai-toolkit-realm.json -Dkeycloak.migration.replace-placeholders=true -Dkeycloak.profile.feature.upload_scripts=enabled -Dkeycloak.migration.strategy=IGNORE_EXISTING
 
   extraVolumes: |
     - name: genai-toolkit-realm-secret
