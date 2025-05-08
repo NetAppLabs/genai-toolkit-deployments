@@ -249,7 +249,10 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     # Install SMB CSI driver if missing.
     if ! helm list -n kube-system | grep -q 'csi-driver-smb'; then
         helm repo add csi-driver-smb https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
+        helm repo update
         helm install csi-driver-smb csi-driver-smb/csi-driver-smb --namespace kube-system --version v1.16.0
+    else
+      echo "csi-driver-smb already installed - if you have problems with containers using the driver, try uninstalling the csi smb driver and allowing this chart to install"
     fi
 
     missing_deps=$(helm dependency list genai-toolkit-helmcharts | grep missing || true)
