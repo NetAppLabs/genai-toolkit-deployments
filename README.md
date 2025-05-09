@@ -2,6 +2,9 @@
 
 A self-managed cloud native solution with an easy to use UI and API to get started with GenAI, RAG workflows, Chatbots and AI assistants building with unstructured data on Azure NetApp Files or Google Cloud NetApp Volumes. Use it standalone (it has a great UI) or as a component in custom workflows via its API.
 
+## Disclaimer
+This repository contains the automation scripts to setup NetApp's GenAI toolkit. The configurations here-in and automation scripts are provided as is under MIT license.
+
 ## Provides
 - Enterprise level Document Search through LLM vector embeddings (auto embeds with built in PGVector DB)
 - Chatbot (RAG) UI/API
