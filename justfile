@@ -96,12 +96,6 @@ install_local_smb_server local_volume_paths="default" smb_user="smbuser" smb_pas
         echo "SMB credentials: user=${smb_user}, pass=${smb_pass}"
         echo "NodePort: ${smb_port}"
 
-        # # Create or update the secret named 'smbcreds'
-        # kubectl delete secret smbcreds --ignore-not-found=true
-        # kubectl create secret generic smbcreds \
-        #     --from-literal username="{{ smb_user }}" \
-        #     --from-literal password="{{ smb_pass }}"
-
         # Export environment variables for envsubst
         export SMB_SHARES
         export VOLUME_MOUNTS
@@ -168,11 +162,8 @@ install_event_distributor FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requir
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     FS_URLS="{{ FS_URLS }}"
 
-    #HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER\""
-
     echo ""
     echo "===== Installing helm chart for event-distributor ====="
-    #helm upgrade --install event-distributor event-distributor --set-json ${HELM_SET_FLAGS}
     helm upgrade --install event-distributor event-distributor
     echo "=================================================="
     echo ""
@@ -226,7 +217,7 @@ install_smb_listener FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirement
     else
         echo "no SMB volumes founds, skipping smb-listener"
     fi
-    
+
 uninstall_events:
     #!/bin/bash
     helm uninstall smb-listener || true
@@ -267,14 +258,6 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
 
     IFS=';' read -r -a share_names <<< "$volumes"
 
-    # Determine RUNTIME-dependent variables.
-    # RUNTIME="{{ RUNTIME }}"
-    # if [ "${RUNTIME}" = "orbstack" ]; then
-    #     node_ip="$(kubectl get nodes -o wide --no-headers | head -n1 | awk '{print $6}')"
-    # else
-    #     node_ip="localhost"
-    # fi
-
     FS_URLS="{{ FS_URLS }}"
     FS_PROTOCOL="smb"
 
@@ -300,7 +283,6 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
 
 
     HELM_SET_FLAGS="apiv2.secretStore=\"${apiv2_secret_store}\""
-    #HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.cloudEnv=\"$CLOUD_PROVIDER\""
     if [ -n "${nfs_connection_strings}" ]; then
         HELM_SET_FLAGS="${HELM_SET_FLAGS},nfs.volumes=\"$nfs_connection_strings\""
     fi
@@ -415,18 +397,12 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
 
                 share_name_upper=$(basename "$absolute_local_path")
                 share_name=$(echo ${share_name_upper} | tr '[:upper:]' '[:lower:]')
-                #TODO move these settings to global config
                 smb_user="smbuser"
                 smb_pass="mypass"
                 default_smb_port="445"
                 smb_server="smb-server.default.svc.cluster.local"
                 smb_port="${default_smb_port}"
                 smb_port_if_any_with_colon=""
-                #if [ "${RUNTIME}" = "orbstack" ]; then
-                #    smb_port="$(kubectl get svc smb-server -o jsonpath='{.spec.ports[?(@.name=="smb-server")].nodePort}')"
-                #else
-                #    smb_port="445"
-                #fi
                 if [ -n "${smb_port}" ]; then
                     if [ "${smb_port}" != "${default_smb_port}" ]; then
                         # skipping adding port if it is default
@@ -461,7 +437,6 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
                 fi
 
             elif [[ $FS_URL == nfs:* ]]; then
-                # translate nfs://1.2.3.4/export1 to 1.2.3.4:/export1
                 connection_string=$(echo "$FS_URL" | sed -e 's|nfs://||' -e 's|/|:/|')
             fi
             if [ $IS_FIRST -eq 0 ]; then
