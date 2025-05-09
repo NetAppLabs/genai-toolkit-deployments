@@ -16,11 +16,7 @@ spec:
     spec:
       containers:
         - name: genai-toolkit-ui
-          {{- if not .Values.devTag }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-ui:{{ .Chart.Version }}
-          {{- else }}
-          image: {{ .Values.dockerRegistry }}genai-toolkit-ui:{{ .Values.devTag }}
-          {{- end }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -30,14 +26,6 @@ spec:
               value: "AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite-lb.default.svc.cluster.local:10000/devstoreaccount1;QueueEndpoint=http://azurite-lb.default.svc.cluster.local:10001/devstoreaccount1;TableEndpoint=http://azurite-lb.default.svc.cluster.local:10002/devstoreaccount1;"
             - name: AZURE_STORAGE_QUEUE_NAME
               value: "debug-log"
-            - name: AWS_STORAGE_CONNECTION_STRING
-              value: "http://host.docker.internal:4566/000000000000/debug-log"
-            - name: AWS_REGION
-              value: "us-east-1"
-            - name: AWS_ACCESS_KEY_ID
-              value: "test"
-            - name: AWS_SECRET_ACCESS_KEY
-              value: "test"
 ---
 apiVersion: v1
 kind: Service

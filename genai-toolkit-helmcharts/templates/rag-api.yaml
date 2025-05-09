@@ -21,11 +21,7 @@ spec:
           command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-api.{{ .Release.Namespace }}.svc.cluster.local:8001/health; do echo waiting for genai-toolkit-api; sleep 2; done']
       containers:
         - name: genai-toolkit-rag-api
-          {{- if not .Values.devTag }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-rag-api:{{ .Chart.Version }}
-          {{- else }}
-          image: {{ .Values.dockerRegistry }}genai-toolkit-rag-api:{{ .Values.devTag }}
-          {{- end }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8002

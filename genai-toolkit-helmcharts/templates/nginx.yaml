@@ -16,11 +16,7 @@ spec:
     spec:
       containers:
         - name: genai-toolkit-nginx
-          {{- if not .Values.devTag }}
           image: {{ .Values.dockerRegistry }}nginx:{{ .Chart.Version }}
-          {{- else }}
-          image: {{ .Values.dockerRegistry }}nginx:{{ .Values.devTag }}
-          {{- end }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

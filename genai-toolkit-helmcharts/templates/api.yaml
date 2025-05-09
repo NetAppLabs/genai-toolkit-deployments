@@ -24,11 +24,7 @@ spec:
           command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-keycloakx-http.{{ .Release.Namespace }}.svc.cluster.local/auth; do echo waiting for keycloak; sleep 2; done']
       containers:
         - name: genai-toolkit-api
-          {{- if .Values.devTag }}
-          image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Values.devTag }}
-          {{- else }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Chart.Version }}
-          {{- end }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8001
@@ -52,16 +48,11 @@ spec:
               value: genai-toolkit
             - name: KEYCLOAK_EXPOSED_HOST
               value: http://localhost
-            {{- if .Values.localDev }}
-            - name: KEYCLOAK_CLIENT_SECRET
-              value: super-secret-password
-            {{- else }}
             - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: client-secret
                   key: CLIENT_SECRET
-            {{- end }}
             - name: KEYCLOAK_CLIENT_ID
               value: genai-toolkit-client
             {{- if .Values.aws }}
