@@ -14,12 +14,17 @@ env:
       secretKeyRef:
         name: genai-toolkit-api-key
         key: key
+  - name: FILE_EVENTS_QUEUE
+    value: "file-events"
   - name: DEBUG_QUEUE
     value: "debug-log"
   - name: AzureWebJobsStorage
     value: "AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite-lb.default.svc.cluster.local:10000/devstoreaccount1;QueueEndpoint=http://azurite-lb.default.svc.cluster.local:10001/devstoreaccount1;TableEndpoint=http://azurite-lb.default.svc.cluster.local:10002/devstoreaccount1;"
   - name: CLOUD_PROVIDER
     value: "AZURE"
+  # Comment out if you want more detailed logging
+  - name: NODE_ENV
+    value: "production"
 
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
