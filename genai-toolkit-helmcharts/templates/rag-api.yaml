@@ -22,7 +22,7 @@ spec:
       containers:
         - name: genai-toolkit-rag-api
           image: {{ .Values.dockerRegistry }}genai-toolkit-rag-api:{{ .Chart.Version }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8002
               protocol: TCP

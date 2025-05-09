@@ -25,7 +25,7 @@ spec:
       containers:
         - name: genai-toolkit-api
           image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Chart.Version }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8001
               protocol: TCP
