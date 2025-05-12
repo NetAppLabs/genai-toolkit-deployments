@@ -410,6 +410,8 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
                 # Determine if path is absolute or relative
                 if [[ "$local_path" = /* ]]; then
                     absolute_local_path="$local_path"
+                elif [[ "$local_path" = ~* ]]; then
+                    absolute_local_path="$(echo ${local_path})"
                 else
                     absolute_local_path="${LOCALDIR}/$local_path"
                 fi
