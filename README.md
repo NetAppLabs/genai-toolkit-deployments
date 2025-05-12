@@ -38,11 +38,11 @@ This repository contains the automation scripts to set up NetApp's GenAI toolkit
     - [Quickstart](#local-deployment-quickstart)
     - [Requirements](#local-deployment-requirements)
     - [Deployment](#local-deployment)
-  - [Advanced](#advanced)
+3. [Advanced](#advanced)
     - [Helm Chart Parameters](#helm-chart-parameters)
-3. [Screenshots](#screenshots)
-3. [Changelog](#changelog)
-4. [Support](#support)
+4. [Screenshots](#screenshots)
+5. [Changelog](#changelog)
+6. [Support](#support)
 
 
 
@@ -239,9 +239,11 @@ just install /path/to/your/dataset/directory,/path/to/your/second/dataset/direct
 
 After the toolkit starts up, use `localhost` to access the UI in your preferred browser or to make direct API calls.
 
-### Advanced
+## Advanced
 
 ### Helm Chart Parameters
+
+#### GenAI Toolkit Helm Chart Options - found in [genai-toolkit-helmcharts/values.yaml](./genai-toolkit-helmcharts/values.yaml)
 
 | Parameter             | Description                                      | Default Value                   | Available values          |
 |-----------------------|--------------------------------------------------|---------------------------------|---------------------------|
@@ -253,6 +255,27 @@ Note: By not setting the `db.connectionString` the toolkit will default to use a
 
 There are other optional variables but these are only used for development of the toolkit and do not require any attention.
 
+
+**Note**: To use an actual Azure Storage connection string - the following three options must be modified:
+
+1. Event Distributor Helm Chart [values.yaml](./event-distributor/values.yaml)
+
+| Parameter             | Description                        | Default Value                                                                                                                                                                  | Available values                                                                                                |
+|-----------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `AzureWebJobsStorage` | An Azure Storage connection string | Defaults to using the connection string for a local [azurite](https://github.com/Azure/Azurite) instance in your kubernetes cluster and the default azurite connection string. | Optionally override this with an actual Azure Storage connection string that has access to Azure Queue Storage. |
+
+
+2.  SMB Listener Helm Chart [values.yaml](./smb-listener/values.yaml)
+
+| Parameter                   | Description                        | Default Value                                                                                                                                                                  | Available values                                                                                                |
+|-----------------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `azure.aqsConnectionString` | An Azure Storage connection string | Defaults to using the connection string for a local [azurite](https://github.com/Azure/Azurite) instance in your kubernetes cluster and the default azurite connection string. | Optionally override this with an actual Azure Storage connection string that has access to Azure Queue Storage. |
+
+3. GenAI Toolkit UI deployment [ui.yaml](genai-toolkit-helmcharts/templates/ui.yaml)
+
+| Environment Variable              | Description                        | Default Value                                                                                                                                                                  | Available values                                                                                                |
+|-----------------------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `AZURE_STORAGE_CONNECTION_STRING` | An Azure Storage connection string | Defaults to using the connection string for a local [azurite](https://github.com/Azure/Azurite) instance in your kubernetes cluster and the default azurite connection string. | Optionally override this with an actual Azure Storage connection string that has access to Azure Queue Storage. |
 
 
 ## Screenshots (on Azure)
