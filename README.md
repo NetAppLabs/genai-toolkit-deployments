@@ -1,4 +1,4 @@
-# NetApp's GenAI Toolkit 
+# NetApp's GenAI Toolkit
 
 ☁️ A self-managed, cloud-native solution with an easy-to-use UI and API. 
 
