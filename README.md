@@ -1,12 +1,14 @@
-# NetApp's GenAI Toolkit
+# NetApp's GenAI Toolkit 
 
-A self-managed cloud native solution with an easy to use UI and API to get started with GenAI, RAG workflows, Chatbots and AI assistants building with unstructured data on Azure NetApp Files or Google Cloud NetApp Volumes. Use it standalone (it has a great UI) or as a component in custom workflows via its API.
+☁️ A self-managed, cloud-native solution with an easy-to-use UI and API. 
+
+Get started using your unstructured data to build with GenAI, RAG workflows, Chatbots, and AI assistants on Azure NetApp Files or Google Cloud NetApp Volumes. Use it on its own with the intuitive UI, or leverage the API to build your own custom workflows.
 
 ## Disclaimer
-This repository contains the automation scripts to setup NetApp's GenAI toolkit. The configurations here-in and automation scripts are provided as is under MIT license.
+This repository contains the automation scripts to set up NetApp's GenAI toolkit. The configurations herein and automation scripts are provided as is under the MIT license.
 
 ## Provides
-- Enterprise level Document Search through LLM vector embeddings (auto embeds with built in PGVector DB)
+- Enterprise level Document Search through LLM vector embeddings (auto embeds with built-in PGVector DB)
 - Chatbot (RAG) UI/API
 - Tooling for Chatbots
 - RAG model evaluations
@@ -172,7 +174,7 @@ To get started, follow this guide: [Create an volume for Google Cloud NetApp Vol
 Follow this guide: [Quickstart: Deploy a GKE cluster](https://cloud.google.com/kubernetes-engine/docs/quickstart). Note the VPC where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
 
 #### Verifying Network Access to the GCNV Volume
-For some reason, you are unable to ping or curl the volumes in GCNV from the cluster. But if they are on the same subnet, you should have access to the volume fromt he cluster.
+For some reason, you are unable to ping or curl the volumes in GCNV from the cluster. But if they are on the same subnet, you should have access to the volume from the cluster.
 
 ### GKE Deployment
 Once your Google Cloud resources are set up, deploy the toolkit using:
@@ -208,7 +210,7 @@ With existing local directories:
 just install /path/to/your/dataset/directory,/path/to/your/second/dataset/directory
 ```
 
-Note: The Directories will be mounted into the local k8s cluster
+Note: the directories will be mounted into the local k8s cluster
 
 With existing ANF nfsv3 volumes:
 
@@ -235,7 +237,7 @@ Once your local Kubernetes cluster is set up, deploy the toolkit using:
 just install /path/to/your/dataset/directory,/path/to/your/second/dataset/directory
 ```
 
-After the toolkit starts up use `localhost` to access the UI in your preferred browser or to make direct API calls.
+After the toolkit starts up, use `localhost` to access the UI in your preferred browser or to make direct API calls.
 
 ### Advanced
 
