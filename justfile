@@ -297,6 +297,19 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
         HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.volumeMapping=\"$volumeMapping\""
     fi
 
+    VALUES_FILE="./genai-toolkit-helmcharts/values.yaml"
+    IS_LOCAL=$(echo ${config_json} | jq -r .isLocal)
+
+    # Check if cluster is running locally and the machine is an Apple M4 Mac; if yes, append the necessary flag to the values file.
+    if [ "${IS_LOCAL}" == "true" ]; then
+        if sysctl -a | grep "machdep.cpu.brand_string" | grep -q "Apple M4"; then
+            perl -pi -e 's/(-Dkeycloak\.migration\.strategy=IGNORE_EXISTING)(?!.*-XX:UseSVE=0)/$1 -XX:UseSVE=0/' "$VALUES_FILE"
+        else
+            # For others, remove the flag if present.
+            perl -pi -e 's/(-Dkeycloak\.migration\.strategy=IGNORE_EXISTING) ?-XX:UseSVE=0/$1/' "$VALUES_FILE"
+        fi
+    fi
+
     # Perform the helm upgrade/install (ensure the chart reference is correct).
     echo ""
     echo "===== Installing helm chart for genai-toolkit ====="
@@ -351,7 +364,8 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
         CONFIG_FILE_ORIG="${CONFIG_FILE}"
         CONFIG_FILE="${CONFIG_FILE_ORIG}.json"
         echo "config file does not exist - creating it"
-        IS_LOCAL="true"
+
+        IS_LOCAL="false"
 
         if [[ "${FS_URLS}" == "default" ]]; then
             FS_URLS="smb-volume"
@@ -359,15 +373,13 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
             echo ""
             echo " Adding one smb volume with name ${FS_URLS}"
             echo ""
-            IS_LOCAL="true"
-        else
-            if [[ "${FS_URLS}" == smb:* ]]; then
-                # assuming non local for smb urls
-                IS_LOCAL="false"
-            elif [[ "${FS_URLS}" == nfs:* ]]; then
-                # assuming non local for nfs urls
-                IS_LOCAL="false"
+
+            # Check if the endpoint is localhost
+            endpoint=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+            if echo "$endpoint" | grep -E -q 'localhost|127\.0\.0\.1'; then
+                IS_LOCAL="true"
             fi
+        else
             IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
             for fs_url in "${fs_urls_array[@]}"; do
                 echo "Adding FS URL : $fs_url"
