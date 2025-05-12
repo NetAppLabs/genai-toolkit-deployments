@@ -197,11 +197,12 @@ kubectl get svc genai-toolkit-nginx -o jsonpath='{.status.loadBalancer.ingress[0
 ```
 
 Use this IP to access the UI in your preferred browser or to make direct API calls.
+
 ### Local K8s
 
 #### Local Deployment Requirements
 
-For Keycloak to work on Apple's Silicon macOS, you need to run the following to update your values.yaml file:
+For Keycloak to work on macOS devices powered by Apple's M4 Silicon chip, you need to run the following command to update your values.yaml file:
 
 ```sh
 perl -pi -e 's/(-Dkeycloak\.migration\.strategy=IGNORE_EXISTING)(?!.*-XX:UseSVE=0)/$1 -XX:UseSVE=0/' "/path/to/values/file"
