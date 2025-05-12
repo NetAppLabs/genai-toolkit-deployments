@@ -405,7 +405,8 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
                 if [[ $FS_URL == local:* ]]; then
                     local_path=$(echo "${FS_URL}" | sed -e 's|local://||' -e 's|/|:|')
                 else
-                    local_path="${FS_URL}"
+                    local_path=${FS_URL/#\~/${HOME}}
+                    echo "local_path is now: $local_path"
                 fi
                 # Determine if path is absolute or relative
                 if [[ "$local_path" = /* ]]; then
