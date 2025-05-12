@@ -274,8 +274,8 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     # Calculate the volume mappings
     i=0
     volumeMapping=""
-    for fs_url in "${volume_urls[@]}"; do
-        vol_name=${volume_names[$i]}
+    for fs_url in "${volume_urls_array[@]}"; do
+        vol_name=${volume_names_array[$i]}
         vol_path="/ontap/${vol_name}"
         volumeMapping="${volumeMapping}${fs_url};${vol_path}__"
         i=$((i+1))
