@@ -256,7 +256,7 @@ Note: By not setting the `db.connectionString` the toolkit will default to use a
 There are other optional variables but these are only used for development of the toolkit and do not require any attention.
 
 
-**Note**: To use an actual Azure Storage connection string - the following three options must be modified:
+**Note**: To use native Azure Queue Storage with an Azure Storage connection string - the following three options must be modified:
 
 1. Event Distributor Helm Chart [values.yaml](./event-distributor/values.yaml)
 
