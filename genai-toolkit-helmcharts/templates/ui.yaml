@@ -14,31 +14,18 @@ spec:
       labels:
         app: genai-toolkit-ui
     spec:
-      initContainers:
-        - name: wait-for-auth
-          image: busybox
-          command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-rag-api.{{ .Release.Namespace }}.svc.cluster.local:8002/health; do echo waiting for genai-toolkit-rag-api; sleep 2; done']
       containers:
         - name: genai-toolkit-ui
-          {{- if not .Values.localTesting }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-ui:{{ .Chart.Version }}
-          {{- else }}
-          image: {{ .Values.dockerRegistry }}genai-toolkit-ui:{{ .Values.devTag }}
-          {{- end }}
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
               protocol: TCP
-          volumeMounts:
-            - name: rsa-keys-volume
-              mountPath: /keys/public
-      volumes:
-        - name: rsa-keys-volume
-          secret:
-            secretName: rsa-keys
-            items:
-              - key: public_key.rsa
-                path: public_key.rsa
+          env:
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              value: "AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite-lb.default.svc.cluster.local:10000/devstoreaccount1;QueueEndpoint=http://azurite-lb.default.svc.cluster.local:10001/devstoreaccount1;TableEndpoint=http://azurite-lb.default.svc.cluster.local:10002/devstoreaccount1;"
+            - name: AZURE_STORAGE_QUEUE_NAME
+              value: "debug-log"
 ---
 apiVersion: v1
 kind: Service

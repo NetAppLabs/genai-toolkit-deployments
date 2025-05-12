@@ -1,0 +1,64 @@
+# Default values for smb-listener
+
+cloudProvider: AZURE
+
+smb:
+  urls: []
+  listenerRetries: 10
+
+azure:
+  aqsConnectionString: AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite-lb.default.svc.cluster.local:10000/devstoreaccount1;QueueEndpoint=http://azurite-lb.default.svc.cluster.local:10001/devstoreaccount1;TableEndpoint=http://azurite-lb.default.svc.cluster.local:10002/devstoreaccount1;
+
+aws:
+  region: eu-west-1
+  sqsQueueUrl: ""
+  sqsMessageGroupId: ""
+  iam: true
+
+nats:
+  url: ""
+  subject: ""
+
+# This sets the smb-listener container image
+dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
+image:
+  name: smb-listener
+  pullPolicy: IfNotPresent
+
+# Define the resources you'd like to request for smb-listener
+resources:
+  limits:
+    cpu: '0'
+    memory: '0'
+  requests:
+    cpu: '0'
+    memory: '0'
+
+replicaCount: 1
+
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets:
+  - name: nlghcr
+
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  annotations: { }
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: { }
+podLabels: { }
+podSecurityContext: { }
+securityContext: { }
+volumeMounts: { }
+volumes: { }
+nodeSelector: { }
+tolerations: [ ]
+affinity: { }

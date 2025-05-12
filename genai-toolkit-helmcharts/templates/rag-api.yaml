@@ -17,14 +17,11 @@ spec:
       initContainers:
         - name: wait-for-api
           image: busybox
+          imagePullPolicy: IfNotPresent
           command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-api.{{ .Release.Namespace }}.svc.cluster.local:8001/health; do echo waiting for genai-toolkit-api; sleep 2; done']
       containers:
         - name: genai-toolkit-rag-api
-          {{- if not .Values.localTesting }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-rag-api:{{ .Chart.Version }}
-          {{- else }}
-          image: {{ .Values.dockerRegistry }}genai-toolkit-rag-api:{{ .Values.devTag }}
-          {{- end }}
           imagePullPolicy: Always
           ports:
             - containerPort: 8002
@@ -44,30 +41,38 @@ spec:
                       {{ else }}
                         {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
                       {{ end }}
+            - name: KEYCLOAK_HOST
+              value: http://genai-toolkit-keycloakx-http.{{ .Release.Namespace }}.svc.cluster.local
+            - name: KEYCLOAK_AUTH_PATH
+              value: /auth
+            - name: KEYCLOAK_REALM
+              value: genai-toolkit
           volumeMounts:
-            - name: rsa-keys-volume
-              mountPath: /keys/public
-            {{- if ne .Values.cloudProvider "local" }}
+            {{- if .Values.nfs.volumes }}
               {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
                 {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
-                {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
+                {{- $concatString := printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $nfs_volume_parts 1) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $concatString }}
               {{- end }}
             {{- else }}
-              {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+              {{- if .Values.smb.volumes }}
+                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
+                  {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
+                  {{- $new_parts := splitList "?" (last $volume_parts) }}
+                  {{- $volume_mount_point := printf "%s/%s/%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $new_parts 0) }}
+            - name: smb-volume-{{ $index }}
+              mountPath: {{ $volume_mount_point }}
+                {{- end }}
+              {{- else if gt (len .Values.localVolumePaths) 0 }}
+                {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $.Values.volumesMountPoint }}/ontap/{{ (splitList "/" $local_dirs | last) }}
+                {{- end }}
               {{- end }}
             {{- end }}
       volumes:
-        - name: rsa-keys-volume
-          secret:
-            secretName: rsa-keys
-            items:
-              - key: public_key.rsa
-                path: public_key.rsa
-        {{- if ne .Values.cloudProvider "local" }}
+        {{- if .Values.nfs.volumes }}
           {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
             {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
         - name: nfs-volume-{{ $index }}
@@ -75,10 +80,18 @@ spec:
             claimName: netapp-nfs-pvc-{{ $index }}
           {{- end }}
         {{- else }}
-          {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+          {{- if .Values.smb.volumes }}
+            {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
+        - name: smb-volume-{{ $index }}
+          persistentVolumeClaim:
+            claimName: netapp-smb-volume-pvc-{{ $index }}
+            {{- end }}
+          {{- else if gt (len .Values.localVolumePaths) 0 }}
+            {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
         - name: nfs-volume-{{ $index }}
           hostPath:
             path: {{ $local_dirs }}
+            {{- end }}
           {{- end }}
         {{- end }}
 ---

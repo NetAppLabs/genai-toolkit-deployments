@@ -2,6 +2,9 @@
 
 A self-managed cloud native solution with an easy to use UI and API to get started with GenAI, RAG workflows, Chatbots and AI assistants building with unstructured data on Azure NetApp Files or Google Cloud NetApp Volumes. Use it standalone (it has a great UI) or as a component in custom workflows via its API.
 
+## Disclaimer
+This repository contains the automation scripts to setup NetApp's GenAI toolkit. The configurations here-in and automation scripts are provided as is under MIT license.
+
 ## Provides
 - Enterprise level Document Search through LLM vector embeddings (auto embeds with built in PGVector DB)
 - Chatbot (RAG) UI/API
@@ -13,7 +16,8 @@ A self-managed cloud native solution with an easy to use UI and API to get start
 -----------------------
 
 ## Table of Contents
-1. [Deploying the Toolkit](#deploying-the-toolkit)
+1. [Prerequisites](#prerequisites)
+2. [Deploying the Toolkit](#deploying-the-toolkit)
   - [AKS](#aks)
     - [Quickstart](#aks-quickstart)
     - [Requirements](#aks-requirements)
@@ -32,31 +36,59 @@ A self-managed cloud native solution with an easy to use UI and API to get start
     - [Quickstart](#local-deployment-quickstart)
     - [Requirements](#local-deployment-requirements)
     - [Deployment](#local-deployment)
-  - [Extra deployment info](#extra)
-    - [Helm Parameters](#helm-parameters)
-    - [Required Parameters](#required-parameters)
-    - [Optional Parameters](#optional-parameters)
-2. [Screenshots](#screenshots)
+  - [Advanced](#advanced)
+    - [Helm Chart Parameters](#helm-chart-parameters)
+3. [Screenshots](#screenshots)
 3. [Changelog](#changelog)
 4. [Support](#support)
 
 
+
+## Prerequisites
+
+The installation requires that you have an already created Kubernetes cluster, either running locally or in the Cloud.
+
+The installation requires [just](https://just.systems/man/en/) which is installable via a package manager like e.g. with brew:
+
+```sh
+brew install just
+```
+
+It also requires the following tools:
+
+  - [kubectl](https://kubernetes.io/docs/reference/kubectl/)
+  - [helm](https://helm.sh)
+  - [jq](https://jqlang.org/manual/)
+  - [yq](https://mikefarah.gitbook.io/yq)
+  - [envsubst](https://formulae.brew.sh/formula/gettext)
+
+
 ## Deploying the Toolkit
-The toolkit consists of Kubernetes YAML files, packaged as Helm charts, which can be installed on any cluster using Helm. Below are instructions on how to deploy the toolkit to a local Kubernetes cluster, AKS, and GKE. If your environment is already set up, you can use the `Quickstart` section for each deployment method.
+The deployment consists of Kubernetes YAML files, packaged as Helm charts, which can be installed on any cluster using Helm. Below are instructions on how to deploy the toolkit to a local Kubernetes cluster, AKS, and GKE. If your environment is already set up, you can use the `Quickstart` section for each deployment method.
 
 ### AKS
 
+
 #### AKS Quickstart
+
+With existing ANF nfsv3 volumes:
+
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.volumes="1.2.3.4:/path1\,5.6.7.8:/path2"
+just install nfs://1.2.3.4/export1,nfs://5.6.7.8/export2 AZURE
 ```
-Note the escaped comma in the nfs.volumes list. All commas have to be escaped (for now)
+
+With existing ANF SMB volumes:
+
+```sh
+just install smb://smbuser:smbpass@smbserver/share?sec=ntlmssp AZURE
+```
+
 
 #### AKS Requirements
 For ANF, the toolkit requires an AKS cluster, at least one ANF volume, and connectivity between the volumes and the cluster.
 
 #### Setting up an ANF Volume
-To get started, follow this guide: [Create an NFS volume for Azure NetApp Files](https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-volumes). Note the vNet where you create the volume. Once the volume is available, proceed to the next step.
+To get started, follow the guides for [Create an SMB volume for Azure NetApp Files](https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-volumes-smb) or  [Create an NFS volume for Azure NetApp Files](https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-volumes). Note the vNet where you create the volume. Once the volume is available, proceed to the next step.
 
 #### Setting up an AKS Cluster
 Follow this guide: [Quickstart: Deploy an Azure Kubernetes Service (AKS) cluster using Azure portal](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-portal?tabs=azure-cli). Note the vNet where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
@@ -98,16 +130,19 @@ To verify network access between your AKS cluster and the ANF volume, follow the
 
 If you receive responses, the network access between the AKS cluster and the ANF volume is properly configured.
 
-### AKS Deployment
-Once your Azure resources are set up, deploy the toolkit using:
+#### AKS Deployment
+
+With existing ANF nfsv3 volumes:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="anf",nfs.volumes="1.2.3.4:/path1;5.6.7.8:/path2"
+just install nfs://1.2.3.4/export1,nfs://5.6.7.8/export2 AZURE
 ```
-Note that the delimiter to split volumes for `nfs.volumes` is a semicolon.
 
+With existing ANF SMB volumes:
 
-Replace `nfs.volumes` with the NFS paths of your ANF volumes. This information is available in the mount instructions for the volume.
+```sh
+just install smb://smbuser:smbpass@smbserver/share?sec=ntlmssp AZURE
+```
 
 After the toolkit starts up, get the public IP by running:
 
@@ -120,17 +155,18 @@ Use this IP to access the UI in your preferred browser or to make direct API cal
 ### GKE
 
 #### GKE Quickstart
+
+
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1;5.6.7.8:/path2"
+just install smb://smbuser:smbpass@smbserver/share?sec=ntlmssp
 ```
-Note that the delimiter to split volumes for `nfs.volumes` is a semicolon.
 
 
 #### GKE Requirements
 For GCNV, the toolkit requires a GKE cluster, at least one GCNV volume, and connectivity between the volumes and the cluster.
 
 #### Setting up a GCNV Volume
-To get started, follow this guide: [Create an NFS volume for Google Cloud NetApp Volumes](https://cloud.google.com/netapp/docs/create-volumes). Note the VPC where you create the volume. Once the volume is available, proceed to the next step.
+To get started, follow this guide: [Create an volume for Google Cloud NetApp Volumes](https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/create-volume). Note the VPC where you create the volume. Once the volume is available, proceed to the next step.
 
 #### Setting up a GKE Cluster
 Follow this guide: [Quickstart: Deploy a GKE cluster](https://cloud.google.com/kubernetes-engine/docs/quickstart). Note the VPC where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
@@ -141,13 +177,18 @@ For some reason, you are unable to ping or curl the volumes in GCNV from the clu
 ### GKE Deployment
 Once your Google Cloud resources are set up, deploy the toolkit using:
 
+
+With existing GCNV nfsv3 volumes:
+
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="gcnv",nfs.volumes="1.2.3.4:/path1;5.6.7.8:/path2"
+just install nfs://1.2.3.4/export1,nfs://5.6.7.8/export2
 ```
-Note that the delimiter to split volumes for `nfs.volumes` is a semicolon.
 
+With existing GCNV SMB volumes:
 
-Replace `nfs.volumes` with the NFS paths of your ANF volumes. This information is available in the mount instructions for the volume.
+```sh
+just install smb://smbuser:smbpass@smbserver/share?sec=ntlmssp
+```
 
 After the toolkit starts up, get the public IP by running:
 
@@ -156,12 +197,31 @@ kubectl get svc genai-toolkit-nginx -o jsonpath='{.status.loadBalancer.ingress[0
 ```
 
 Use this IP to access the UI in your preferred browser or to make direct API calls.
+
 ### Local K8s
 
 #### Local Deployment Quickstart
+
+With existing local directories:
+
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localVolumePaths="/path/to/your/dataset/directory"
+just install /path/to/your/dataset/directory,/path/to/your/second/dataset/directory
 ```
+
+Note: The Directories will be mounted into the local k8s cluster
+
+With existing ANF nfsv3 volumes:
+
+```sh
+just install nfs://1.2.3.4/export1,nfs://5.6.7.8/export2
+```
+
+With existing ANF SMB volumes:
+
+```sh
+just install smb://smbuser:smbpass@smbserver/share?sec=ntlmssp
+```
+
 
 #### Local Deployment Requirements
 For local deployment, you need a local Kubernetes cluster running. You can use Docker Desktop to set up a local Kubernetes cluster. Follow this guide to enable Kubernetes in Docker Desktop: [Docker Desktop - Enable Kubernetes](https://docs.docker.com/desktop/kubernetes/).
@@ -172,21 +232,20 @@ We have also tested this on Minikube and Orbstack but theoretically, it should w
 Once your local Kubernetes cluster is set up, deploy the toolkit using:
 
 ```sh
-helm install genai-toolkit genai-toolkit-helmcharts --set cloudProvider="local",localVolumePaths="/path/to/your/dataset/directory;/path/to/your/second/dataset/directory"
+just install /path/to/your/dataset/directory,/path/to/your/second/dataset/directory
 ```
 
-Replace `localVolumePaths` is a list of absolute paths to your datasets on your local machine. This will mount your local directories into the container as "ONTAP" volumes.
-
 After the toolkit starts up use `localhost` to access the UI in your preferred browser or to make direct API calls.
+
+### Advanced
 
 ### Helm Chart Parameters
 
 | Parameter             | Description                                      | Default Value                   | Available values          |
 |-----------------------|--------------------------------------------------|---------------------------------|---------------------------|
 | `nfs.volumes`         | A list of NFS connection strings                 | None                            |                           |
-| `cloudProvider`       | The cloud provider to use.                       | `anf`                           | `anf` / `gcnv` / `local`  |
+| `smb.volumes`         | A list of SMB connection strings                 | None                            |                           |
 | `db.connectionString` | The database connection string                   | To K8s DB                       |                           |
-| `localVolumePaths`    | The local directory to use as a dataset "volume" | None                            |                           |                  
 
 Note: By not setting the `db.connectionString` the toolkit will default to use an in cluster database. This is not recommended for production use cases. For testing, it is fine.
 
@@ -200,10 +259,30 @@ There are other optional variables but these are only used for development of th
 ![Save Smart Prompt](images/savesmartprompt.png)
 ![Image Generation](images/image-generation.png)
 ![API](images/api.png)
+![Datasets and subscriptions](images/datasets.png)
 
 
 
 ## Changelog
+
+v0.8.1:
+
+- Minor fixes
+
+v0.8.0:
+
+- Added chat capabilities to FileBrowser and improved dataset embedding workflows.
+- Introduced claims-based authentication and authorization features.
+- Enhanced local development setup with new configurations and tools.
+- Resolved issues with UI freezes, dataset embedding, and socket connection errors.
+- Fixed health check API log spam and improved AWS setup reliability.
+- Refactored dataset database structure and optimized justfile commands.
+- Updated third-party dependencies and improved event logging.
+- Updated documentation with new workflows and synced changes to the NetApp organization repository.
+- Made swagger security schemes global and added detailed claims descriptions.
+- Improved Kubernetes and EKS setup scripts.
+- Added support for running in local/NATS mode and refined secrets management..
+
 v0.7.0:
 - Fixed multiple bugs, including token logout issues, local development paths, clustering slowness, and UI build failures.
 - Added support for Claude3, Anthropic API integration, and bearer tokens in the Tool Manager.

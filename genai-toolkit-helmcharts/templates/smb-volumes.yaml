@@ -1,0 +1,39 @@
+{{- if .Values.smb.volumes }}
+{{- range $index, $smb_volume_connection_string := (splitList ";" $.Values.smb.volumes) }}
+  {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
+  {{- $new_parts := splitList "?" (last $volume_parts) }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: smb-volume-{{ $index }}
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: smb-storage
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: smb-volume-{{ $index }}
+    volumeAttributes:
+      source: {{ $smb_volume_connection_string }}
+    nodeStageSecretRef:
+      name: smbcreds
+      namespace: default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netapp-smb-volume-pvc-{{ $index }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: smb-storage
+  volumeName: smb-volume-{{ $index }}
+{{- end }}
+{{- end }}

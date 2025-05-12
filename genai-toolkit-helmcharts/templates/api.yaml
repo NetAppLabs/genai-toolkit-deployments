@@ -14,17 +14,17 @@ spec:
       labels:
         app: genai-toolkit-api
     spec:
+      {{- if or (eq .Values.apiv2.secretStore "iam") (eq .Values.apiv2.secretStore "kubernetes") }}
+      serviceAccountName: {{ .Values.apiv2.serviceAccount.name | default "genai-toolkit-api-sa" }}
+      {{- end }}
       initContainers:
-        - name: wait-for-auth
+        - name: wait-for-keycloak
+          imagePullPolicy: IfNotPresent
           image: busybox
-          command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-auth.{{ .Release.Namespace }}.svc.cluster.local:8080/health; do echo waiting for genai-toolkit-auth; sleep 2; done']
+          command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-keycloakx-http.{{ .Release.Namespace }}.svc.cluster.local/auth; do echo waiting for keycloak; sleep 2; done']
       containers:
         - name: genai-toolkit-api
-          {{- if not .Values.localTesting }}
           image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Chart.Version }}
-          {{- else }}
-          image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Values.devTag }}
-          {{- end }}
           imagePullPolicy: Always
           ports:
             - containerPort: 8001
@@ -38,12 +38,55 @@ spec:
                       {{ else }}
                         {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
                       {{ end }}
-            - name: PUBLIC_KEY_PATH
-              value: /keys/public/public_key.rsa
             - name: RAGAS_HOST
               value: http://genai-toolkit-rag-api.{{ .Release.Namespace }}.svc.cluster.local:8002
+            - name: KEYCLOAK_HOST
+              value: http://genai-toolkit-keycloakx-http.{{ .Release.Namespace }}.svc.cluster.local
+            - name: KEYCLOAK_AUTH_PATH
+              value: /auth
+            - name: KEYCLOAK_REALM
+              value: genai-toolkit
+            - name: KEYCLOAK_EXPOSED_HOST
+              value: http://localhost
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: client-secret
+                  key: CLIENT_SECRET
+            - name: KEYCLOAK_CLIENT_ID
+              value: genai-toolkit-client
+            {{- if .Values.aws }}
+            - name: AWS_REGION
+              value: "{{ .Values.aws.region }}"
+            - name: AWS_ACCESS_KEY_ID
+              value: "{{ .Values.aws.accessKeyId }}"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "{{ .Values.aws.secretKey }}"
+            - name: AWS_SESSION_TOKEN
+              value: "{{ .Values.aws.sessionToken }}"
+            {{- end }}
+            - name: APIV2_SECRET_STORE
+              value: "{{ .Values.apiv2.secretStore }}"
+            - name: CLOUD_ENV
+              value: "{{ .Values.apiv2.cloudEnv }}"
+            - name: API_KEY_LIFETIME_DAYS
+              value: "{{ .Values.apiv2.apiKeyLifetimeDays }}"
             - name: TOOLKIT_VERSION
               value: {{ .Chart.Version | quote }}
+            {{- if .Values.apiv2.volumeMapping }}
+            - name: APIV2_VOLUME_MAPPING
+              value: {{ .Values.apiv2.volumeMapping }}
+            {{- else if .Values.smb.volumes }}
+            - name: APIV2_VOLUME_MAPPING
+              value: {{ $allConcatStrings := "" -}}
+                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
+                  {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
+                  {{- $new_parts := splitList "?" (last $volume_parts) }}
+                  {{- $concatString :=  printf "%s;/%s/%s" $smb_volume_connection_string $.Values.cloudStorageProvider (index $new_parts 0) }}
+                  {{- $allConcatStrings = printf "%s%s__" $allConcatStrings $concatString -}}
+                {{- end -}}
+                {{- $allConcatStrings | trimSuffix "__" }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /health
@@ -52,29 +95,38 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
           volumeMounts:
-            - name: rsa-keys-volume
-              mountPath: /keys/public
-            {{- if ne .Values.cloudProvider "local" }}
+            - name: keycloak-realm-json
+              mountPath: /app/kubernetes/files/genai-toolkit-realm.json
+              subPath: genai-toolkit-realm.json
+              readOnly: true
+            {{- if (gt (len .Values.nfs.volumes) 0) }}
               {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
                 {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
-                {{- $concatString :=  printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudProvider (index $nfs_volume_parts 1)}}
+                {{- $concatString := printf "%s/%s%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $nfs_volume_parts 1) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $concatString }}
               {{- end }}
             {{- else }}
-              {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+              {{- if .Values.smb.volumes }}
+                {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
+                  {{- $volume_parts := splitList "/" $smb_volume_connection_string }}
+                  {{- $new_parts := splitList "?" (last $volume_parts) }}
+                  {{- $volume_mount_point := printf "%s/%s/%s" $.Values.volumesMountPoint $.Values.cloudStorageProvider (index $new_parts 0) }}
+            - name: volume-{{ $index }}
+              mountPath: {{ $volume_mount_point }}
+                {{- end }}
+              {{- else if gt (len .Values.localVolumePaths) 0 }}
+                {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
             - name: nfs-volume-{{ $index }}
               mountPath: {{ $.Values.volumesMountPoint }}/ontap/{{ (splitList "/" $local_dirs | last) }}
+                {{- end }}
               {{- end }}
             {{- end }}
       volumes:
-        - name: rsa-keys-volume
+        - name: keycloak-realm-json
           secret:
-            secretName: rsa-keys
-            items:
-              - key: public_key.rsa
-                path: public_key.rsa
-        {{- if ne .Values.cloudProvider "local" }}
+            secretName: {{ .Release.Name }}-realm-secret
+        {{- if (gt (len .Values.nfs.volumes) 0) }}
           {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}
             {{- $nfs_volume_parts := splitList ":" $nfs_volumes }}
         - name: nfs-volume-{{ $index }}
@@ -82,10 +134,18 @@ spec:
             claimName: netapp-nfs-pvc-{{ $index }}
           {{- end }}
         {{- else }}
-          {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
+          {{- if .Values.smb.volumes }}
+            {{- range $index, $smb_volume_connection_string := (splitList ";" .Values.smb.volumes) }}
+        - name: volume-{{ $index }}
+          persistentVolumeClaim:
+            claimName: netapp-smb-volume-pvc-{{ $index }}
+            {{- end }}
+          {{- else if gt (len .Values.localVolumePaths) 0 }}
+            {{- range $index, $local_dirs := (splitList ";" .Values.localVolumePaths) }}
         - name: nfs-volume-{{ $index }}
           hostPath:
             path: {{ $local_dirs }}
+            {{- end }}
           {{- end }}
         {{- end }}
 ---

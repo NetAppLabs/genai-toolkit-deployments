@@ -4,8 +4,137 @@ db:
 nfs:
   volumes: ""
 
-cloudProvider: "anf"
+smb:
+  volumes: ""
+
+cloudStorageProvider: "ontap"
+
+apiv2:
+  volumeMapping: ""
+  secretStore:
+  serviceAccount:
+    name: "genai-toolkit-api-sa"
+    annotations:
+      eks.amazonaws.com/role-arn: ""
+    labels: {}
+  apiKeyLifetimeDays:
 
 #Do not change unless you know what you are doing
 volumesMountPoint: "/root_dir"
 dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
+
+keycloakx:
+  command:
+    - "/opt/keycloak/bin/kc.sh"
+    - "start"
+    - "--http-port=8080"
+    - "--hostname-strict=false"
+
+  database:
+    vendor: postgres
+    hostname: postgres.default.svc.cluster.local
+    port: 5432
+    database: genai-toolkit-db
+    username: admin
+    password: admin
+
+  extraEnv: |
+    - name: KEYCLOAK_ADMIN
+      value: admin
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      value: admin
+    - name: KC_DB_SCHEMA
+      value: keycloak
+    - name: JAVA_OPTS_APPEND
+      value: >-
+        -Djgroups.dns.query={{ include "keycloak.fullname" . }}-headless -Dkeycloak.migration.action=import -Dkeycloak.migration.provider=singleFile -Dkeycloak.migration.file=/genai-toolkit-realm/genai-toolkit-realm.json -Dkeycloak.migration.replace-placeholders=true -Dkeycloak.profile.feature.upload_scripts=enabled -Dkeycloak.migration.strategy=IGNORE_EXISTING
+
+  extraVolumes: |
+    - name: genai-toolkit-realm-secret
+      secret:
+        secretName: genai-toolkit-realm-secret
+
+  extraVolumeMounts: |
+    - name: genai-toolkit-realm-secret
+      mountPath: "/genai-toolkit-realm/"
+      readOnly: true
+
+  extraInitContainers: |
+    - name: generate-client-secret
+      image: alpine:3.16
+      env:
+        - name: PGPASSWORD
+          value: admin
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -e
+          echo "Generating or retrieving client secret..."
+          apk add --no-cache openssl curl postgresql-client && \
+          echo "Installed dependencies." && \
+          curl -LO "https://dl.k8s.io/release/v1.31.1/bin/linux/amd64/kubectl" && \
+          chmod +x ./kubectl && \
+          mv ./kubectl /usr/local/bin/kubectl && \
+          echo "Downloaded and installed kubectl."
+
+          # Check if the Keycloak schema exists in PostgreSQL
+          SCHEMA_EXISTS=$(psql -h postgres.default.svc.cluster.local -U admin -d genai-toolkit-db -t -c "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'keycloak';" | xargs)
+
+          if [ -z "$SCHEMA_EXISTS" ]; then
+            echo "Keycloak schema does not exist. Assuming fresh start."
+            CLIENT_SECRET=$(openssl rand -base64 32)
+            echo "Client secret generated for fresh start."
+          else
+            # Check if the client secret already exists in PostgreSQL
+            EXISTING_SECRET=$(psql -h postgres.default.svc.cluster.local -U admin -d genai-toolkit-db -t -c "SELECT TRIM(secret) FROM keycloak.client WHERE client_id = 'genai-toolkit-client';" | xargs)
+
+            if [ -z "$EXISTING_SECRET" ]; then
+              # If the secret does not exist, generate a new one
+              CLIENT_SECRET=$(openssl rand -base64 32)
+              echo "Client secret generated."
+            else
+              # Use the existing secret
+              CLIENT_SECRET=$EXISTING_SECRET
+              echo "Using existing client secret from PostgreSQL."
+            fi
+          fi
+
+          cp /realm-secret/genai-toolkit-realm.json genai-toolkit-realm.json
+          echo "Copied genai-toolkit-realm.json from Secret."
+
+          sed -i "s|super-secret-password|$CLIENT_SECRET|g" genai-toolkit-realm.json
+          echo "Updated genai-toolkit-realm.json with client secret."
+
+          kubectl create secret generic genai-toolkit-realm-secret \
+            --from-file=genai-toolkit-realm.json=genai-toolkit-realm.json \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "genai-toolkit-realm-secret updated with modified genai-toolkit-realm.json."
+
+          kubectl create secret generic client-secret \
+            --from-literal=CLIENT_SECRET="$(echo -n $CLIENT_SECRET)" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "client-secret Kubernetes Secret created or updated."
+      volumeMounts:
+        - name: genai-toolkit-realm-secret
+          mountPath: /realm-secret
+    - name: init-db-schema
+      image: postgres:13
+      env:
+        - name: PGPASSWORD
+          value: admin
+      command:
+        - sh
+      args:
+        - -c
+        - |
+          echo "Waiting for the database to be ready..."
+          until psql -h postgres.default.svc.cluster.local -U admin -d genai-toolkit-db -c '\q'; do
+            >&2 echo "Postgres is unavailable - sleeping"
+            sleep 5
+          done
+          echo "Postgres is up - creating schema if it doesn't exist..."
+          psql -h postgres.default.svc.cluster.local -U admin -d genai-toolkit-db -c 'CREATE SCHEMA IF NOT EXISTS keycloak;'
+
+  serviceAccount:
+    create: false
+    name: secret-manager
