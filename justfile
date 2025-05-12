@@ -322,6 +322,7 @@ uninstall_genai:
 
 install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
+    set -e
     FS_URLS="{{ FS_URLS }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     just configure "${FS_URLS}" "${CLOUD_PROVIDER}"
@@ -366,6 +367,11 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
         echo "config file does not exist - creating it"
 
         IS_LOCAL="false"
+        # Check if the endpoint is localhost
+        endpoint=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+        if echo "$endpoint" | grep -E -q 'localhost|127\.0\.0\.1'; then
+            IS_LOCAL="true"
+        fi
 
         if [[ "${FS_URLS}" == "default" ]]; then
             FS_URLS="smb-volume"
@@ -374,11 +380,6 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
             echo " Adding one smb volume with name ${FS_URLS}"
             echo ""
 
-            # Check if the endpoint is localhost
-            endpoint=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-            if echo "$endpoint" | grep -E -q 'localhost|127\.0\.0\.1'; then
-                IS_LOCAL="true"
-            fi
         else
             IFS=',' read -r -a fs_urls_array <<< "$FS_URLS"
             for fs_url in "${fs_urls_array[@]}"; do
@@ -395,6 +396,12 @@ configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
             elif [[ $FS_URL == smb:* ]]; then
                 echo "found smb url, skipping prep"
             else
+                if [ "${IS_LOCAL}" == "false" ]; then
+                    echo "Local volumes not supported for remote cluster, please provide valid smb:// or nfs:// urls"
+                    rm "${CONFIG_FILE}" || true
+                    exit 1
+                fi
+
                 if [[ $FS_URL == local:* ]]; then
                     local_path=$(echo "${FS_URL}" | sed -e 's|local://||' -e 's|/|:|')
                 else
