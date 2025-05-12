@@ -1,12 +1,14 @@
 # NetApp's GenAI Toolkit
 
-A self-managed cloud native solution with an easy to use UI and API to get started with GenAI, RAG workflows, Chatbots and AI assistants building with unstructured data on Azure NetApp Files or Google Cloud NetApp Volumes. Use it standalone (it has a great UI) or as a component in custom workflows via its API.
+☁️ A self-managed, cloud-native solution with an easy-to-use UI and API. 
+
+Get started using your unstructured data to build with GenAI, RAG workflows, Chatbots, and AI assistants on Azure NetApp Files or Google Cloud NetApp Volumes. Use it on its own with the intuitive UI, or leverage the API to build your own custom workflows.
 
 ## Disclaimer
-This repository contains the automation scripts to setup NetApp's GenAI toolkit. The configurations here-in and automation scripts are provided as is under MIT license.
+This repository contains the automation scripts to set up NetApp's GenAI toolkit. The configurations herein and automation scripts are provided as is under the MIT license.
 
 ## Provides
-- Enterprise level Document Search through LLM vector embeddings (auto embeds with built in PGVector DB)
+- Enterprise level Document Search through LLM vector embeddings (auto embeds with built-in PGVector DB)
 - Chatbot (RAG) UI/API
 - Tooling for Chatbots
 - RAG model evaluations
@@ -36,11 +38,11 @@ This repository contains the automation scripts to setup NetApp's GenAI toolkit.
     - [Quickstart](#local-deployment-quickstart)
     - [Requirements](#local-deployment-requirements)
     - [Deployment](#local-deployment)
-  - [Advanced](#advanced)
+3. [Advanced](#advanced)
     - [Helm Chart Parameters](#helm-chart-parameters)
-3. [Screenshots](#screenshots)
-3. [Changelog](#changelog)
-4. [Support](#support)
+4. [Screenshots](#screenshots)
+5. [Changelog](#changelog)
+6. [Support](#support)
 
 
 
@@ -172,7 +174,7 @@ To get started, follow this guide: [Create an volume for Google Cloud NetApp Vol
 Follow this guide: [Quickstart: Deploy a GKE cluster](https://cloud.google.com/kubernetes-engine/docs/quickstart). Note the VPC where you create the cluster. Once you can run `kubectl` commands locally against the cluster, proceed to the next step.
 
 #### Verifying Network Access to the GCNV Volume
-For some reason, you are unable to ping or curl the volumes in GCNV from the cluster. But if they are on the same subnet, you should have access to the volume fromt he cluster.
+For some reason, you are unable to ping or curl the volumes in GCNV from the cluster. But if they are on the same subnet, you should have access to the volume from the cluster.
 
 ### GKE Deployment
 Once your Google Cloud resources are set up, deploy the toolkit using:
@@ -208,7 +210,7 @@ With existing local directories:
 just install /path/to/your/dataset/directory,/path/to/your/second/dataset/directory
 ```
 
-Note: The Directories will be mounted into the local k8s cluster
+Note: the directories will be mounted into the local k8s cluster
 
 With existing ANF nfsv3 volumes:
 
@@ -235,11 +237,13 @@ Once your local Kubernetes cluster is set up, deploy the toolkit using:
 just install /path/to/your/dataset/directory,/path/to/your/second/dataset/directory
 ```
 
-After the toolkit starts up use `localhost` to access the UI in your preferred browser or to make direct API calls.
+After the toolkit starts up, use `localhost` to access the UI in your preferred browser or to make direct API calls.
 
-### Advanced
+## Advanced
 
 ### Helm Chart Parameters
+
+#### GenAI Toolkit Helm Chart Options - found in [genai-toolkit-helmcharts/values.yaml](./genai-toolkit-helmcharts/values.yaml)
 
 | Parameter             | Description                                      | Default Value                   | Available values          |
 |-----------------------|--------------------------------------------------|---------------------------------|---------------------------|
@@ -251,6 +255,27 @@ Note: By not setting the `db.connectionString` the toolkit will default to use a
 
 There are other optional variables but these are only used for development of the toolkit and do not require any attention.
 
+
+**Note**: To use native Azure Queue Storage with an Azure Storage connection string - the following three options must be modified:
+
+1. Event Distributor Helm Chart [values.yaml](./event-distributor/values.yaml)
+
+| Parameter             | Description                        | Default Value                                                                                                                                                                  | Available values                                                                                                |
+|-----------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `AzureWebJobsStorage` | An Azure Storage connection string | Defaults to using the connection string for a local [azurite](https://github.com/Azure/Azurite) instance in your kubernetes cluster and the default azurite connection string. | Optionally override this with an actual Azure Storage connection string that has access to Azure Queue Storage. |
+
+
+2.  SMB Listener Helm Chart [values.yaml](./smb-listener/values.yaml)
+
+| Parameter                   | Description                        | Default Value                                                                                                                                                                  | Available values                                                                                                |
+|-----------------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `azure.aqsConnectionString` | An Azure Storage connection string | Defaults to using the connection string for a local [azurite](https://github.com/Azure/Azurite) instance in your kubernetes cluster and the default azurite connection string. | Optionally override this with an actual Azure Storage connection string that has access to Azure Queue Storage. |
+
+3. GenAI Toolkit UI deployment [ui.yaml](genai-toolkit-helmcharts/templates/ui.yaml)
+
+| Environment Variable              | Description                        | Default Value                                                                                                                                                                  | Available values                                                                                                |
+|-----------------------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `AZURE_STORAGE_CONNECTION_STRING` | An Azure Storage connection string | Defaults to using the connection string for a local [azurite](https://github.com/Azure/Azurite) instance in your kubernetes cluster and the default azurite connection string. | Optionally override this with an actual Azure Storage connection string that has access to Azure Queue Storage. |
 
 
 ## Screenshots (on Azure)
