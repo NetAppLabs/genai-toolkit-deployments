@@ -259,13 +259,29 @@ There are other optional variables but these are only used for development of th
 ![Save Smart Prompt](images/savesmartprompt.png)
 ![Image Generation](images/image-generation.png)
 ![API](images/api.png)
+![Datasets and subscriptions](images/datasets.png)
 
 
 
 ## Changelog
 
+v0.8.1:
+
+- Minor fixes
+
 v0.8.0:
-- Simplified volume deployment via just.
+
+- Added chat capabilities to FileBrowser and improved dataset embedding workflows.
+- Introduced claims-based authentication and authorization features.
+- Enhanced local development setup with new configurations and tools.
+- Resolved issues with UI freezes, dataset embedding, and socket connection errors.
+- Fixed health check API log spam and improved AWS setup reliability.
+- Refactored dataset database structure and optimized justfile commands.
+- Updated third-party dependencies and improved event logging.
+- Updated documentation with new workflows and synced changes to the NetApp organization repository.
+- Made swagger security schemes global and added detailed claims descriptions.
+- Improved Kubernetes and EKS setup scripts.
+- Added support for running in local/NATS mode and refined secrets management..
 
 v0.7.0:
 - Fixed multiple bugs, including token logout issues, local development paths, clustering slowness, and UI build failures.
