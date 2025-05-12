@@ -277,7 +277,11 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     for fs_url in "${volume_urls_array[@]}"; do
         vol_name=${volume_names_array[$i]}
         vol_path="/ontap/${vol_name}"
-        volumeMapping="${volumeMapping}${fs_url};${vol_path}__"
+        if [ $((i+1)) -eq ${#volume_urls_array[@]} ]; then
+                volumeMapping="${volumeMapping}${fs_url};${vol_path}"
+            else
+                volumeMapping="${volumeMapping}${fs_url};${vol_path}__"
+        fi
         i=$((i+1))
     done
 
