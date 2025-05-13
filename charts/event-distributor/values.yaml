@@ -30,7 +30,7 @@ env:
 image:
   repository: us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/event-distributor
   # This sets the pull policy for images.
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: "v0.8.3-rc"
 
