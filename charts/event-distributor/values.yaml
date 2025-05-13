@@ -27,12 +27,12 @@ env:
     value: "production"
 
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+# This sets the smb-listener container image
+dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
 image:
-  repository: us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/event-distributor
-  # This sets the pull policy for images.
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
   tag: "v0.8.3-rc"
+  name: event-distributor
+  pullPolicy: IfNotPresent
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
