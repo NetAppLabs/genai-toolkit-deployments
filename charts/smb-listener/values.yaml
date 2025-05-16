@@ -22,6 +22,7 @@ nats:
 # This sets the smb-listener container image
 dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
 image:
+  tag: ""
   name: smb-listener
   pullPolicy: IfNotPresent
 

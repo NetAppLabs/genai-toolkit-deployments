@@ -1,0 +1,9 @@
+dependencies:
+- name: searxng
+  repository: https://charts.searxng.org
+  version: 1.0.0
+- name: keycloakx
+  repository: https://codecentric.github.io/helm-charts
+  version: 3.0.0
+digest: sha256:678b89aeb65fdadb1ef7dca45750662170b3f40dc8b59bf2bdb4b8b5ac81f819
+generated: "2025-01-16T01:01:46.573953Z"
