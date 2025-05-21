@@ -149,6 +149,8 @@ keycloakx:
     name: secret-manager
 
 searxng:
+  image:
+    tag: 2025.5.18-5dff826
   searxng:
     config:
       use_default_settings: true
