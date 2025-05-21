@@ -16,12 +16,13 @@ spec:
     spec:
       containers:
         - name: genai-toolkit-nginx
-          image: {{ .Values.dockerRegistry }}nginx:{{ .Chart.Version }}
+          image: {{ .Values.dockerRegistry }}genai-toolkit-nginx:{{ default .Chart.Version .Values.image.tag }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
             - containerPort: 443
             - containerPort: 8001
+            - containerPort: 8002
 ---
 apiVersion: v1
 kind: Service
@@ -44,3 +45,7 @@ spec:
       port: 8001
       targetPort: 8001
       name: api
+    - protocol: TCP
+      port: 8002
+      targetPort: 8002
+      name: ragas

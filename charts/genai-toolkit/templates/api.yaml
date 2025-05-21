@@ -24,8 +24,8 @@ spec:
           command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-keycloakx-http.{{ .Release.Namespace }}.svc.cluster.local/auth; do echo waiting for keycloak; sleep 2; done']
       containers:
         - name: genai-toolkit-api
-          image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ .Chart.Version }}
-          imagePullPolicy: Always
+          image: {{ .Values.dockerRegistry }}genai-toolkit-api:{{ default .Chart.Version .Values.image.tag }}
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8001
               protocol: TCP
@@ -33,11 +33,14 @@ spec:
             - name: ROOT_DIR
               value: {{ .Values.volumesMountPoint }}
             - name: DB_CONNECTION_STRING
-              value: {{ if .Values.db.connectionString }}
-                        {{ .Values.db.connectionString | quote }}
-                      {{ else }}
-                        {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
-                      {{ end }}
+              {{- if .Values.db.connectionString }}
+              value: {{ .Values.db.connectionString | quote }}
+              {{- else }}
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-constring
+                  key: POSTGRES_CONNECTION_STRING
+            {{- end }}
             - name: RAGAS_HOST
               value: http://genai-toolkit-rag-api.{{ .Release.Namespace }}.svc.cluster.local:8002
             - name: KEYCLOAK_HOST
@@ -48,11 +51,16 @@ spec:
               value: genai-toolkit
             - name: KEYCLOAK_EXPOSED_HOST
               value: http://localhost
+              {{- if .Values.keycloakx.clientSecret }}
+            - name: KEYCLOAK_CLIENT_SECRET
+              value: {{ .Values.keycloakx.clientSecret }}
+              {{- else }}
             - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: client-secret
                   key: CLIENT_SECRET
+              {{- end }}
             - name: KEYCLOAK_CLIENT_ID
               value: genai-toolkit-client
             {{- if .Values.aws }}
@@ -72,7 +80,11 @@ spec:
             - name: API_KEY_LIFETIME_DAYS
               value: "{{ .Values.apiv2.apiKeyLifetimeDays }}"
             - name: TOOLKIT_VERSION
-              value: {{ .Chart.Version | quote }}
+              value: {{ if not .Values.image.tag }}
+                        {{ .Chart.Version | quote }}
+                      {{ else }}
+                        {{ printf "%s-%s" .Chart.Version .Values.image.tag }}
+                      {{ end }}
             {{- if .Values.apiv2.volumeMapping }}
             - name: APIV2_VOLUME_MAPPING
               value: {{ .Values.apiv2.volumeMapping }}

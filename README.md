@@ -243,7 +243,7 @@ After the toolkit starts up, use `localhost` to access the UI in your preferred 
 
 ### Helm Chart Parameters
 
-#### GenAI Toolkit Helm Chart Options - found in [genai-toolkit-helmcharts/values.yaml](./genai-toolkit-helmcharts/values.yaml)
+#### GenAI Toolkit Helm Chart Options - found in [charts/genai-toolkit/values.yaml](./charts/genai-toolkit/values.yaml)
 
 | Parameter             | Description                                      | Default Value                   | Available values          |
 |-----------------------|--------------------------------------------------|---------------------------------|---------------------------|
@@ -271,7 +271,7 @@ There are other optional variables but these are only used for development of th
 |-----------------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
 | `azure.aqsConnectionString` | An Azure Storage connection string | Defaults to using the connection string for a local [azurite](https://github.com/Azure/Azurite) instance in your kubernetes cluster and the default azurite connection string. | Optionally override this with an actual Azure Storage connection string that has access to Azure Queue Storage. |
 
-3. GenAI Toolkit UI deployment [ui.yaml](genai-toolkit-helmcharts/templates/ui.yaml)
+3. GenAI Toolkit UI deployment [ui.yaml](charts/genai-toolkit/templates/ui.yaml)
 
 | Environment Variable              | Description                        | Default Value                                                                                                                                                                  | Available values                                                                                                |
 |-----------------------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
