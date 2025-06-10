@@ -1,0 +1,235 @@
+{{- if .Values.registerOntapJob.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fseventsjob-sa
+  namespace: {{ .Release.Namespace }}
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fseventsjob-role-1
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fseventsjob-role-2
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "patch", "create"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fseventsjob-rolebinding-1
+  namespace: {{ .Release.Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: fseventsjob-sa
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: fseventsjob-role-1
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fseventsjob-rolebinding-2
+  namespace: {{ .Release.Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: fseventsjob-sa
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: fseventsjob-role-2
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: timestamp-config
+data:
+  timestamp: "{{ now | unixEpoch }}"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: post-install-ssh-job
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+spec:
+  ttlSecondsAfterFinished: 100
+  template:
+    spec:
+      serviceAccountName: fseventsjob-sa
+      restartPolicy: OnFailure
+      containers:
+        - name: ssh-container
+          image: ghcr.io/netapplabs/alpine-sshpass-shell:latest
+          imagePullPolicy: Always
+          command: [ "/bin/bash", "-c" ]
+          {{- $serviceName := include "fs-events-server.fullname" . -}}
+          {{- $namespace := .Release.Namespace | default "default" -}}
+          {{- $ontapHost := .Values.ontap.host -}}
+          {{- $vserverUuid := .Values.ontap.vserver -}}
+          {{- $fsesExternalPort := .Values.service.port }}
+          args:
+            - |
+              echo "Waiting for FS-Events Server service to get an external IP..."
+              ADDRESSES=""
+              timeout=300
+              interval=10
+              elapsed=0
+              while [ -z "$ADDRESSES" ] && [ $elapsed -lt $timeout ]; do
+                ADDRESSES=`kubectl get svc -o json | jq -r '.items[] | select(.metadata.name | test("{{- $serviceName -}}-")).status.loadBalancer.ingress[0].ip'`
+                if echo "$ADDRESSES" | grep -q "null"; then
+                  echo "Found a null service IP, waiting for $interval seconds"
+                  ADDRESSES=""
+                  sleep $interval
+                  elapsed=$((elapsed + interval))
+                else
+                  echo "FS-Events Server service has external IPs: $ADDRESSES"
+                fi
+              done
+              if [ -z "$ADDRESSES" ]; then
+                echo "FS-Events Server service had at least one instance that did not get an external IP within $timeout seconds. Exiting."
+                exit 1
+              else
+                PRIMARY_ADDRESSES=""
+                SECONDARY_ADDRESSES=""
+                i=0
+                while IFS= read -r line; do
+                  if [ $((i % 2)) -eq 0 ]; then
+                    if [ -z "$PRIMARY_ADDRESSES" ]; then
+                      echo "Adding $line as the first IP to PRIMARY_ADDRESSES"
+                      PRIMARY_ADDRESSES="$line"
+                    else
+                      echo "Adding $line to PRIMARY_ADDRESSES"
+                      PRIMARY_ADDRESSES="$PRIMARY_ADDRESSES,$line"
+                    fi
+                  else
+                    if [ -z "$SECONDARY_ADDRESSES" ]; then
+                      echo "Adding $line as the first IP to SECONDARY_ADDRESSES"
+                      SECONDARY_ADDRESSES="$line"
+                    else
+                      echo "Adding $line to SECONDARY_ADDRESSES"
+                      SECONDARY_ADDRESSES="$SECONDARY_ADDRESSES,$line"
+                    fi
+                  fi
+                  i=$((i + 1))
+                done <<< "$ADDRESSES"
+              fi
+              echo "PRIMARY_ADDRESSES: $PRIMARY_ADDRESSES"
+              echo "SECONDARY_ADDRESSES: $SECONDARY_ADDRESSES"
+              echo "Sleeping for 30 seconds to ensure fpolicy is started"
+              sleep 30
+              echo "Removing old fpolicy policies..."
+              timestamp=$TIMESTAMP_CONFIG
+              echo "fpolicy disable"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy disable -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp"
+              echo "fpolicy policy scope delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy scope delete -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp"
+              echo "fpolicy policy delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy delete -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp"
+              echo "fpolicy policy event delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy event delete -vserver {{ $vserverUuid }} -event-name fpolicy-event-$timestamp"
+              echo "fpolicy policy external-engine delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy external-engine delete -vserver {{ $vserverUuid }} -engine-name fpolicy-$timestamp"
+
+              timestamp=$(date +%s)
+              echo "Setting up fs-events-server using cvs host {{ $ontapHost }}, vserver {{ $vserverUuid }}, and timestamp: $timestamp ..."
+              kubectl patch configmap timestamp-config -p "{\"data\":{\"timestamp\":\"$timestamp\"}}"
+              echo "nfs modify"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver nfs modify -vserver {{ $vserverUuid }} -mount-rootonly disabled"
+              echo "fpolicy policy external-engine create"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy external-engine create -extern-engine-format protobuf -vserver {{ $vserverUuid }} -engine-name fpolicy-$timestamp -primary-servers $PRIMARY_ADDRESSES -secondary-servers $SECONDARY_ADDRESSES -port {{ $fsesExternalPort }} -extern-engine-type asynchronous -ssl-option no-auth"
+              echo "fpolicy policy event create"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy event create -vserver {{ $vserverUuid }} -event-name fpolicy-event-$timestamp -protocol nfsv3 -file-operations create,create_dir,delete,delete_dir,link,read,write,rename,rename_dir,setattr"
+              echo "fpolicy policy create"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy create -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp -events fpolicy-event-$timestamp -engine fpolicy-$timestamp -is-mandatory false"
+              echo "fpolicy policy scope create"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy scope create -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp -volumes-to-include \"*\" -export-policies-to-include \"*\""
+              echo "fpolicy enable"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy enable -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp -sequence-number 1"
+              # sleep for 2 minutes
+              sleep 120
+              echo "fpolicy show-engine"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy show-engine -vserver {{ $vserverUuid }}"
+          env:
+            - name: SSHUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ontap.adminSecretName }}
+                  key: {{ .Values.ontap.adminSecretUserKey }}
+            - name: SSHPASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ontap.adminSecretName }}
+                  key: {{ .Values.ontap.adminSecretPasswordKey }}
+            - name: TIMESTAMP_CONFIG
+              valueFrom:
+                configMapKeyRef:
+                  name: timestamp-config
+                  key: timestamp
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: deregister-ontap
+  annotations:
+    "helm.sh/hook": pre-delete
+spec:
+  ttlSecondsAfterFinished: 100
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: fseventsjob-sa
+      containers:
+        - name: ssh-container
+          image: ghcr.io/netapplabs/alpine-sshpass-shell:latest
+          imagePullPolicy: Always
+          command: [ "/bin/bash", "-c" ]
+          args:
+            - |
+              echo "Removing old fpolicy policies..."
+              timestamp=$TIMESTAMP_CONFIG
+              echo "fpolicy disable"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy disable -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp"
+              echo "fpolicy policy scope delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy scope delete -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp"
+              echo "fpolicy policy delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy delete -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp"
+              echo "fpolicy policy event delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy event delete -vserver {{ $vserverUuid }} -event-name fpolicy-event-$timestamp"
+              echo "fpolicy policy external-engine delete"
+              sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy external-engine delete -vserver {{ $vserverUuid }} -engine-name fpolicy-$timestamp"
+          env:
+            - name: SSHUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ontap.adminSecretName }}
+                  key: {{ .Values.ontap.adminSecretUserKey }}
+            - name: SSHPASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ontap.adminSecretName }}
+                  key: {{ .Values.ontap.adminSecretPasswordKey }}
+            - name: TIMESTAMP_CONFIG
+              valueFrom:
+                configMapKeyRef:
+                  name: timestamp-config
+                  key: timestamp
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+{{- end }}

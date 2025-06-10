@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "fs-events-server.fullname" . }}
+  labels:
+    {{- include "fs-events-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "fs-events-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "fs-events-server.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "fs-events-server.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ .Values.dockerRegistry }}{{ .Values.image.name }}:{{ default .Chart.Version .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+          {{- if .Values.azure.aqsConnectionStringSecretName }}
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.azure.aqsConnectionStringSecretName }}
+                  key: {{ .Values.azure.aqsConnectionStringSecretKey }}
+          {{- else if .Values.azure.aqsConnectionString }}
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              value: {{ .Values.azure.aqsConnectionString }}
+          {{- end }}
+          {{- if .Values.aws.region }}
+            - name: AWS_REGION
+              value: {{ .Values.aws.region }}
+          {{- end }}
+          {{- if .Values.aws.accessKeyId }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ .Values.aws.accessKeyId }}
+          {{- end }}
+          {{- if .Values.aws.secretAccessKey }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ .Values.aws.secretAccessKey }}
+          {{- end }}
+          {{- if .Values.aws.sessionToken }}
+            - name: AWS_SESSION_TOKEN
+              value: {{ .Values.aws.sessionToken }}
+          {{- end }}
+          {{- if .Values.nats.url }}
+            - name: NATS_URL
+              value: {{ .Values.nats.url }}
+          {{- end }}
+          {{- if .Values.nats.url }}
+            - name: NATS_SUBJECT
+              value: {{ .Values.nats.subject }}
+          {{- end }}
+          command: [ "/server" ]
+          args:
+            - "-p"
+            - "{{ .Values.service.port }}"
+            - "--config"
+            - "/app/config.yaml"
+          ports:
+            - name: fses-tcp
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+            - name: hm-tcp
+              containerPort: 2112
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: fs-events-config-volume
+          configMap:
+            name: fs-events-config
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -290,6 +290,10 @@ There are other optional variables but these are only used for development of th
 
 ## Changelog
 
+v0.9.0:
+
+- Add initial support for FS-Events Server to handle Fpolicy events.
+
 v0.8.1:
 
 - Minor fixes
