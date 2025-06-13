@@ -170,9 +170,9 @@ install_fs_events FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
     FS_URLS=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="nfs") | .access[].url] | join(";")')
 
-    ONTAP_SECRET_NAME=$(yq -r '.ontap.adminSecretName' fs-events-server/values.yaml)
-    ONTAP_SECRET_USER_KEY=$(yq -r '.ontap.adminSecretUserKey' fs-events-server/values.yaml)
-    ONTAP_SECRET_PASSWORD_KEY=$(yq -r '.ontap.adminSecretPasswordKey' fs-events-server/values.yaml)
+    ONTAP_SECRET_NAME=$(yq -r '.ontap.adminSecretName' charts/fs-events-server/values.yaml)
+    ONTAP_SECRET_USER_KEY=$(yq -r '.ontap.adminSecretUserKey' charts/fs-events-server/values.yaml)
+    ONTAP_SECRET_PASSWORD_KEY=$(yq -r '.ontap.adminSecretPasswordKey' charts/fs-events-server/values.yaml)
 
     if kubectl get secret "${ONTAP_SECRET_NAME}" &> /dev/null; then
         SECRET_KEYS=$(kubectl get secret "${ONTAP_SECRET_NAME}" -o json | jq -r '.data | keys[]')
@@ -195,7 +195,7 @@ install_fs_events FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
         HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER\",fsEvents.urls=\"$FS_URLS\""
         echo ""
         echo "===== Installing helm chart for fs-events ====="
-        helm upgrade --install fs-events-server fs-events-server --set-json ${HELM_SET_FLAGS}
+        helm upgrade --install fs-events-server charts/fs-events-server --set-json ${HELM_SET_FLAGS}
         echo "=================================================="
         echo ""
     else
