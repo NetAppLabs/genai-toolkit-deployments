@@ -21,8 +21,8 @@ spec:
           command: ['sh', '-c', 'until wget -qO- http://genai-toolkit-api.{{ .Release.Namespace }}.svc.cluster.local:8001/health; do echo waiting for genai-toolkit-api; sleep 2; done']
       containers:
         - name: genai-toolkit-rag-api
-          image: {{ .Values.dockerRegistry }}genai-toolkit-rag-api:{{ .Chart.Version }}
-          imagePullPolicy: Always
+          image: {{ .Values.dockerRegistry }}genai-toolkit-rag-api:{{ default .Chart.Version .Values.image.tag }}
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8002
               protocol: TCP
@@ -36,17 +36,27 @@ spec:
             - name: JWT_SECRET_KEY
               value: "whatever"
             - name: DB_CONNECTION_STRING
-              value: {{ if .Values.db.connectionString }}
-                        {{ .Values.db.connectionString | quote }}
-                      {{ else }}
-                        {{ printf "Host=postgres.%s.svc.cluster.local;Port=5432;Database=genai-toolkit-db;Username=admin;Password=admin" .Release.Namespace }}
-                      {{ end }}
+              {{- if .Values.db.connectionString }}
+              value: {{ .Values.db.connectionString | quote }}
+              {{- else }}
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-constring
+                  key: POSTGRES_CONNECTION_STRING
+            {{- end }}
             - name: KEYCLOAK_HOST
               value: http://genai-toolkit-keycloakx-http.{{ .Release.Namespace }}.svc.cluster.local
             - name: KEYCLOAK_AUTH_PATH
               value: /auth
             - name: KEYCLOAK_REALM
               value: genai-toolkit
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: 8002
+          #     scheme: HTTP
+          #   initialDelaySeconds: 20
+          #   periodSeconds: 10
           volumeMounts:
             {{- if .Values.nfs.volumes }}
               {{- range $index, $nfs_volumes := (splitList ";" .Values.nfs.volumes) }}

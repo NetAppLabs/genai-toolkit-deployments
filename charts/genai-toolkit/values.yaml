@@ -19,9 +19,18 @@ apiv2:
     labels: {}
   apiKeyLifetimeDays:
 
+aws:
+  region: us-east-1
+  accessKeyId: test
+  secretKey: test
+  sessionToken:
+
+
 #Do not change unless you know what you are doing
 volumesMountPoint: "/root_dir"
 dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
+image:
+  tag: ""
 
 keycloakx:
   command:
@@ -138,3 +147,188 @@ keycloakx:
   serviceAccount:
     create: false
     name: secret-manager
+
+searxng:
+  image:
+    tag: 2025.5.18-5dff826
+  searxng:
+    config:
+      use_default_settings: true
+      outgoing:
+        request_timeout: 7.0
+      search:
+        formats:
+          - json
+      engines:
+        - name: bing
+          disabled: false
+        - name: wikipedia
+          disabled: true
+        - name: github
+          disabled: true
+        - name: stackoverflow
+          disabled: true
+        - name: ahmia
+          disabled: true
+        - name: arch linux wiki
+          disabled: true
+        - name: artic
+          disabled: true
+        - name: arxiv
+          disabled: true
+        - name: bandcamp
+          disabled: true
+        - name: bing images
+          disabled: true
+        - name: bing news
+          disabled: true
+        - name: bing videos
+          disabled: true
+        - name: openverse
+          disabled: true
+        - name: chefkoch
+          disabled: true
+        - name: currency
+          disabled: true
+        - name: deviantart
+          disabled: true
+        - name: docker hub
+          disabled: true
+        - name: wikidata
+          disabled: true
+        - name: duckduckgo
+          disabled: true
+        - name: etymonline
+          disabled: true
+        - name: flickr
+          disabled: true
+        - name: genius
+          disabled: true
+        - name: gentoo
+          disabled: true
+        - name: google images
+          disabled: true
+        - name: google news
+          disabled: true
+        - name: google videos
+          disabled: true
+        - name: google scholar
+          disabled: true
+        - name: hoogle
+          disabled: true
+        - name: kickass
+          disabled: true
+        - name: lemmy communities
+          disabled: true
+        - name: lemmy users
+          disabled: true
+        - name: lemmy posts
+          disabled: true
+        - name: lemmy comments
+          disabled: true
+        - name: z-library
+          disabled: true
+        - name: library of congress
+          disabled: true
+        - name: lingva
+          disabled: true
+        - name: mastodon users
+          disabled: true
+        - name: mastodon hashtags
+          disabled: true
+        - name: mdn
+          disabled: true
+        - name: mixcloud
+          disabled: true
+        - name: mankier
+          disabled: true
+        - name: openairedatasets
+          disabled: true
+        - name: openairepublications
+          disabled: true
+        - name: openstreetmap
+          disabled: true
+        - name: pdbe
+          disabled: true
+        - name: photon
+          disabled: true
+        - name: pinterest
+          disabled: true
+        - name: piped
+          disabled: true
+        - name: piped.music
+          disabled: true
+        - name: piratebay
+          disabled: true
+        - name: podcastindex
+          disabled: true
+        - name: pubmed
+          disabled: true
+        - name: pypi
+          disabled: true
+        - name: qwant
+          disabled: true
+        - name: qwant news
+          disabled: true
+        - name: qwant images
+          disabled: true
+        - name: qwant videos
+          disabled: true
+        - name: radio browser
+          disabled: true
+        - name: sepiasearch
+          disabled: true
+        - name: soundcloud
+          disabled: true
+        - name: askubuntu
+          disabled: true
+        - name: superuser
+          disabled: true
+        - name: solidtorrents
+          disabled: true
+        - name: torch
+          disabled: true
+        - name: unsplash
+          disabled: true
+        - name: yahoo news
+          disabled: true
+        - name: youtube
+          disabled: true
+        - name: dailymotion
+          disabled: true
+        - name: vimeo
+          disabled: true
+        - name: wikinews
+          disabled: true
+        - name: wiktionary
+          disabled: true
+        - name: wikicommons.images
+          disabled: true
+        - name: wikicommons.videos
+          disabled: true
+        - name: wikicommons.audio
+          disabled: true
+        - name: wikicommons.files
+          disabled: true
+        - name: dictzone
+          disabled: true
+        - name: mymemory translated
+          disabled: true
+        - name: wordnik
+          disabled: true
+        - name: tootfinder
+          disabled: true
+        - name: wallhaven
+          disabled: true
+        - name: wttr.in
+          disabled: true
+        - name: brave
+          disabled: true
+        - name: brave.images
+          disabled: true
+        - name: brave.videos
+          disabled: true
+        - name: brave.news
+          disabled: true
+        - name: bt4g
+          disabled: true

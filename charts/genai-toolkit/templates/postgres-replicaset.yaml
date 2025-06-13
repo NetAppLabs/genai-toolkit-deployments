@@ -22,6 +22,10 @@ spec:
           ports:
             - containerPort: 5432
           env:
+            # Replace POSTGRES_INITDB_ARGS with the following to log all queries
+            #   value: "-c log_statement=all -c log_line_prefix=%m | %a | '%i' | SessionCommandCount: %c | "
+            - name: POSTGRES_INITDB_ARGS
+              value: "-c log_line_prefix=\"%m | %a | '%i' | SessionCommandCount: %c | \""
             - name: POSTGRES_DB
               value: "genai-toolkit-db"
             - name: POSTGRES_USER

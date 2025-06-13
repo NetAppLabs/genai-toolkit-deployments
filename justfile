@@ -211,7 +211,7 @@ install_event_distributor FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requir
 
     echo ""
     echo "===== Installing helm chart for event-distributor ====="
-    helm upgrade --install event-distributor event-distributor
+    helm upgrade --install event-distributor charts/event-distributor
     echo "=================================================="
     echo ""
 
@@ -257,7 +257,7 @@ install_smb_listener FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirement
 
         echo ""
         echo "===== Installing helm chart for smb-listener ====="
-        helm upgrade --install smb-listener smb-listener --set-json ${HELM_SET_FLAGS}
+        helm upgrade --install smb-listener charts/smb-listener --set-json ${HELM_SET_FLAGS}
         echo "=================================================="
         echo ""
 
@@ -293,9 +293,9 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
       echo "csi-driver-smb already installed - if you have problems with containers using the driver, try uninstalling the csi smb driver and allowing this chart to install"
     fi
 
-    missing_deps=$(helm dependency list genai-toolkit-helmcharts | grep missing || true)
+    missing_deps=$(helm dependency list charts/genai-toolkit | grep missing || true)
     if [ -n "${missing_deps}" ]; then
-        helm dependency build genai-toolkit-helmcharts
+        helm dependency build charts/genai-toolkit
     fi
 
     # Retrieve parameter values (these may be provided by Just’s templating).
@@ -344,7 +344,7 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
         HELM_SET_FLAGS="${HELM_SET_FLAGS},apiv2.volumeMapping=\"$volumeMapping\""
     fi
 
-    VALUES_FILE="./genai-toolkit-helmcharts/values.yaml"
+    VALUES_FILE="./charts/genai-toolkit/values.yaml"
     IS_LOCAL=$(echo ${config_json} | jq -r .isLocal)
 
     # Check if cluster is running locally and the machine is an Apple M4 Mac; if yes, append the necessary flag to the values file.
@@ -360,7 +360,7 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     # Perform the helm upgrade/install (ensure the chart reference is correct).
     echo ""
     echo "===== Installing helm chart for genai-toolkit ====="
-    helm upgrade --install genai-toolkit genai-toolkit-helmcharts --set-json "${HELM_SET_FLAGS}"
+    helm upgrade --install genai-toolkit charts/genai-toolkit --set-json "${HELM_SET_FLAGS}"
     echo "==================================================="
     echo ""
 
