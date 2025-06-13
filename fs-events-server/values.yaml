@@ -51,7 +51,7 @@ service:
   port: 1101
 
 # This sets the FS-Events Server container image
-dockerRegistry: "ghcr.io/netapplabs/"
+dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
 image:
   tag: ""
   name: fs-events-server
