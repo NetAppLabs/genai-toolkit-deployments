@@ -130,8 +130,27 @@ spec:
               fi
               echo "PRIMARY_ADDRESSES: $PRIMARY_ADDRESSES"
               echo "SECONDARY_ADDRESSES: $SECONDARY_ADDRESSES"
-              echo "Sleeping for 30 seconds to ensure fpolicy is started"
-              sleep 30
+
+              timeout=300
+              interval=5
+              elapsed=0
+              while true; do
+                podstatus=$(kubectl get deployment {{ $serviceName }} -o json)
+                replicas=$(echo "$podstatus" | jq '.status.replicas // 0')
+                ready_replicas=$(echo "$podstatus" | jq '.status.readyReplicas // 0')
+                if [ "$replicas" -eq "$ready_replicas" ] && [ "$replicas" -gt 0 ]; then
+                  echo "All $ready_replicas replicas for deployment {{ $serviceName }} are ready."
+                  break
+                fi
+                if [ $elapsed -ge $timeout ]; then
+                  echo "Timeout waiting for deployment {{ $serviceName }} pods to be ready."
+                  exit 1
+                fi
+                echo "Waiting for deployment {{ $serviceName }} pods to be ready..."
+                sleep $interval
+                elapsed=$((elapsed + interval))
+              done
+
               echo "Removing old fpolicy policies..."
               timestamp=$TIMESTAMP_CONFIG
               echo "fpolicy disable"
@@ -160,8 +179,6 @@ spec:
               sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy policy scope create -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp -volumes-to-include \"*\" -export-policies-to-include \"*\""
               echo "fpolicy enable"
               sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy enable -vserver {{ $vserverUuid }} -policy-name fpolicy-policy-$timestamp -sequence-number 1"
-              # sleep for 2 minutes
-              sleep 120
               echo "fpolicy show-engine"
               sshpass -eSSHPASS ssh -o StrictHostKeyChecking=no $SSHUSER@{{ $ontapHost }} "vserver fpolicy show-engine -vserver {{ $vserverUuid }}"
           env:
