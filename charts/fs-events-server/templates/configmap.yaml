@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fs-events-config
+data:
+  config.yaml: |
+    {{- toYaml .Values.config | nindent 4 }}

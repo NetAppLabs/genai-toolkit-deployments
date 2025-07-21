@@ -1,0 +1,156 @@
+# Default values for fs-events-server.
+
+cloudProvider: LOCAL
+
+azure:
+  aqsConnectionString: ""
+  aqsConnectionStringSecretName: ""
+  aqsConnectionStringSecretKey: connectionString
+  aqsQueueName: ""
+
+aws:
+  accessKeyId: ""
+  secretAccessKey: ""
+  sessionToken: ""
+  region: us-east-1
+  sqsQueueUrl: ""
+  sqsMessageGroupId: ""
+
+nats:
+  url: ""
+  subject: ""
+
+# Configuration block for the ONTAP instance you want to receive FPolicy events from.
+# host, adminSecretName, adminSecretUserKey, and adminSecretPasswordKey are required for the ONTAP SSH Configurator to
+# connect to the ONTAP instance and register the FS-Events Server as a FPolicy Server.
+# Please ensure that you've created the secret with the two required keys beforehand.
+ontap:
+  # svm_YOUR_SVM_NAME
+  vserver:
+  # ONTAP host address that is accessible from your kubernetes cluster
+  host:
+  # Ontap credentials secret name in your kubernetes cluster
+  adminSecretName: ontap-credentials
+  # the key in the adminSecretName that indicates where to find the admin username
+  adminSecretUserKey: username
+  # the key in the adminSecretName that indicates where to find the admin password
+  adminSecretPasswordKey: password
+  volumeName: extreme-volume-1
+  # NFS Volume URL for the volume you want to monitor
+  volumeUrl: nfs://10.1.1.10/nfs_vol1
+
+# Set to true if you want the ONTAP SSH Configurator to register the FS-Events Server as a FPolicy Server or false if
+# you want to manually configure the ontap FPolicy settings.
+registerOntapJob:
+  enabled: true
+
+# This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+service:
+  type: NodePort
+  # This sets the service port and FS Event Server port
+  port: 1101
+
+# This sets the FS-Events Server container image
+dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
+image:
+  tag: ""
+  name: fs-events-server
+  pullPolicy: IfNotPresent
+
+# Define the resources you'd like to request for FS-Events Server
+# FS-Events Server is currently requesting more memory and cpu to accommodate the fact that this initial release is
+# only designed to run as a single replica/instance. In a future release we will allow for an HPA scaling policy.
+# Please adjust these values as needed by the FPolicy activity on your ONTAP instance.
+resources:
+  requests:
+    cpu: 1
+    memory: 1Gi
+
+livenessProbe:
+  httpGet:
+    path: /livez
+    port: 2112
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 2112
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+replicaCount: 1
+
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets:
+  - name: nlghcr
+
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  annotations: { }
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: { }
+podLabels: { }
+podSecurityContext: { }
+securityContext: { }
+volumeMounts:
+  - name: fs-events-config-volume
+    mountPath: /app/config.yaml
+    subPath: config.yaml
+volumes: { }
+nodeSelector: { }
+tolerations: [ ]
+affinity: { }
+
+config:
+  handlerMode: "aqs"
+  serverMode: "fpolicy"
+  logging:
+    level: debug
+    format: json
+    verbose: false
+  handlers:
+#        - name: sqs
+#          provider: sqs
+#          config:
+#            - key: channel-name
+#              value: file-events.fifo
+    - name: 'aqs'
+      mode: 'aqs'
+      config:
+        - key: 'channel-name'
+          value: 'file-events'
+  volumes:
+    - name: nfs1
+      provider: fpolicy
+      config:
+        - key: msid
+          value: 2123242532
+      access:
+        - protocol: nfs
+          url: nfs:/10.254.194.7/nfs_vol1?uid=0&gid=0
+      handler: sqs
+      operationMeta:
+        - key: aws-fsx-fs-id
+          value: fsvol-06173642D77652D63
+    - name: smb2
+      provider: fpolicy
+      config:
+        - key: msid
+          value: 2123242531
+      access:
+        - protocol: smb
+          url: smb://demouser:demopass.1234@10.254.194.7/smb_vol1?sec=ntlmssp
+      handler: sqs
+      operationMeta:
+        - key: aws-fsx-fs-id
+          value: fsvol-06173642D77652D64

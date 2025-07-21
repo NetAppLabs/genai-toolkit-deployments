@@ -1,0 +1,26 @@
+{{- range $i := until (int $.Values.replicaCount) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fs-events-server.fullname" $ }}-{{ $i }}
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+  labels:
+    {{- include "fs-events-server.labels" $ | nindent 4 }}
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ports:
+    - port: {{ $.Values.service.port }}
+      targetPort: {{ $.Values.service.port }}
+      name: fses-tcp
+    - port: 2112
+      targetPort: 2112
+      name: hm-tcp
+  selector:
+    app.kubernetes.io/name: {{ include "fs-events-server.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    statefulset.kubernetes.io/pod-name: {{ include "fs-events-server.fullname" $ }}-{{ $i }}
+---
+{{- end }}

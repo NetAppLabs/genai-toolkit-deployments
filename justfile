@@ -1,5 +1,3 @@
-
-
 default:
     @just -l
 
@@ -145,15 +143,64 @@ uninstall_azurite:
     cd azurite
     kubectl delete -f azurite-k8s.yaml --ignore-not-found || true
 
-install_events FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
+install_events FS_URLS="default" CLOUD_PROVIDER="AZURE" FS_MODE="smb-listener": check_requirements
     #!/bin/bash
 
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     FS_URLS="{{ FS_URLS }}"
+    FS_MODE="{{ FS_MODE }}"
 
-    just install_smb_listener "${FS_URLS}" "${CLOUD_PROVIDER}"
+    if [ "${FS_MODE}" == "smb-listener" ]; then
+        just install_smb_listener "${FS_URLS}" "${CLOUD_PROVIDER}"
+    elif [ "${FS_MODE}" == "fs-events" ]; then
+        just install_fs_events "${FS_URLS}" "${CLOUD_PROVIDER}"
+    else
+        echo "Invalid FS_MODE: ${FS_MODE}. Supported modes are 'smb-listener' and fs-events'."
+        exit 1
+    fi
     just install_event_distributor "${FS_URLS}" "${CLOUD_PROVIDER}"
 
+install_fs_events FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
+    #!/bin/bash
+    set -e
+
+    CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
+    FS_URLS="{{ FS_URLS }}"
+
+    config_json=$(kubectl get configmap genai-config -o yaml | yq -r '.data."config.yaml"' | yq -o json)
+    FS_URLS=$(echo ${config_json} | jq -c -r '[.volumes[] | select(.access[].protocol=="nfs") | .access[].url] | join(";")')
+
+    ONTAP_SECRET_NAME=$(yq -r '.ontap.adminSecretName' charts/fs-events-server/values.yaml)
+    ONTAP_SECRET_USER_KEY=$(yq -r '.ontap.adminSecretUserKey' charts/fs-events-server/values.yaml)
+    ONTAP_SECRET_PASSWORD_KEY=$(yq -r '.ontap.adminSecretPasswordKey' charts/fs-events-server/values.yaml)
+
+    if kubectl get secret "${ONTAP_SECRET_NAME}" &> /dev/null; then
+        SECRET_KEYS=$(kubectl get secret "${ONTAP_SECRET_NAME}" -o json | jq -r '.data | keys[]')
+        if ! echo "$SECRET_KEYS" | grep -qx "${ONTAP_SECRET_USER_KEY}"; then
+            echo "Secret '${ONTAP_SECRET_NAME}' is missing key '${ONTAP_SECRET_USER_KEY}'."
+            exit 1
+        fi
+        if ! echo "$SECRET_KEYS" | grep -qx "${ONTAP_SECRET_PASSWORD_KEY}"; then
+            echo "Secret '${ONTAP_SECRET_NAME}' is missing key '${ONTAP_SECRET_PASSWORD_KEY}'."
+            exit 1
+        fi
+        echo "Secret '${ONTAP_SECRET_NAME}' exists and contains required keys."
+    else
+        echo "Secret '${ONTAP_SECRET_NAME}' does not exist, please create it before deploying fs-events server, e.g. with the following command:"
+        echo "kubectl create secret generic ${ONTAP_SECRET_NAME} --from-literal=${ONTAP_SECRET_USER_KEY}=<ONTAP_USERNAME> --from-literal=${ONTAP_SECRET_PASSWORD_KEY}=<ONTAP_PASSWORD>"
+        exit 1
+    fi
+
+    if [ "${FS_URLS}" != "" ]; then
+        HELM_SET_FLAGS="cloudProvider=\"$CLOUD_PROVIDER\",fsEvents.urls=\"$FS_URLS\""
+        echo ""
+        echo "===== Installing helm chart for fs-events ====="
+        helm upgrade --install fs-events-server charts/fs-events-server --set-json ${HELM_SET_FLAGS}
+        echo "=================================================="
+        echo ""
+    else
+        echo "no NFS volumes founds, skipping fs-events"
+    fi
 
 install_event_distributor FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     #!/bin/bash
@@ -320,9 +367,10 @@ install_genai FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
 uninstall_genai:
     helm uninstall genai-toolkit || true
 
-install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
+install FS_URLS="default" CLOUD_PROVIDER="AZURE" FS_MODE="smb-listener": check_requirements
     #!/bin/bash
     set -e
+    FS_MODE="{{ FS_MODE }}"
     FS_URLS="{{ FS_URLS }}"
     CLOUD_PROVIDER="{{ CLOUD_PROVIDER }}"
     just configure "${FS_URLS}" "${CLOUD_PROVIDER}"
@@ -339,7 +387,7 @@ install FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements
     fi
 
     just install_genai "${FS_URLS}" "${CLOUD_PROVIDER}"
-    just install_events "${FS_URLS}" "${CLOUD_PROVIDER}"
+    just install_events "${FS_URLS}" "${CLOUD_PROVIDER}" "${FS_MODE}"
 
 
 configure FS_URLS="default" CLOUD_PROVIDER="AZURE": check_requirements

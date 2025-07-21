@@ -30,7 +30,7 @@ env:
 # This sets the smb-listener container image
 dockerRegistry: "us-docker.pkg.dev/gcnv-ai-dev/genai-toolkit/"
 image:
-  tag: "v0.8.3-rc"
+  tag: ""
   name: event-distributor
   pullPolicy: IfNotPresent
 
